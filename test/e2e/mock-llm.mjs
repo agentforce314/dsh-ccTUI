@@ -10,7 +10,7 @@ import { LlmAdapter } from '@deepseek-ai/dsh-llm'
 export const name = 'mock-llm'
 export const inject = ['llm', 'commands']
 
-const lastUserText = messages => {
+const lastUserIndex = messages => {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i]
 
@@ -21,10 +21,21 @@ const lastUserText = messages => {
       .map(b => b.text)
       .join('')
 
-    if (text) { return text }
+    if (text) { return i }
   }
 
-  return '(no user text)'
+  return -1
+}
+
+const lastUserText = messages => {
+  const i = lastUserIndex(messages)
+
+  if (i < 0) { return '(no user text)' }
+
+  return (messages[i].content ?? [])
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join('')
 }
 
 const pieces = (text, size = 8) => {
@@ -38,9 +49,23 @@ const pieces = (text, size = 8) => {
 class MockAdapter extends LlmAdapter {
   async *stream(options) {
     const user = lastUserText(options.messages ?? [])
-    const hasToolResult = (options.messages ?? []).some(
-      m => Array.isArray(m.content) && m.content.some(b => b.type === 'tool-result')
-    )
+    // Only tool results from the CURRENT turn count — history keeps old ones.
+    const msgs = options.messages ?? []
+    const hasToolResult = msgs
+      .slice(lastUserIndex(msgs) + 1)
+      .some(m => Array.isArray(m.content) && m.content.some(b => b.type === 'tool-result'))
+
+    if (user.includes('USE-WRITE') && !hasToolResult) {
+      const args = JSON.stringify({ content: 'alpha line\n' + 'beta line\n', file_path: 'e2e-scratch/e2e-write-probe.txt' })
+
+      yield { blockType: 'tool-call', index: 0, type: 'block-start' }
+      yield { argumentsDelta: args, id: 'mock-write-1', name: 'write', type: 'tool-call-delta', index: 0 }
+      yield { block: { arguments: args, id: 'mock-write-1', name: 'write', type: 'tool-call' }, index: 0, type: 'block-end' }
+      yield { type: 'usage', usage: { inputTokens: 9, outputTokens: 5 } }
+      yield { reason: { kind: 'tool-calls' }, type: 'finish' }
+
+      return
+    }
 
     if (user.includes('USE-BASH') && !hasToolResult) {
       const args = JSON.stringify({ command: 'echo e2e-bash-ok', description: 'e2e echo probe', justification: 'e2e approval flow test', sandbox_permissions: 'danger-full-access' })

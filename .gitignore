@@ -7,3 +7,4 @@ packages/clawcodex-ink/dist/
 .dsh-dev-home/
 *.log
 .DS_Store
+e2e-scratch/
