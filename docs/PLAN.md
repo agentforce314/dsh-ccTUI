@@ -134,5 +134,7 @@ Acceptance: docs merged to `main`.
   transcript rehydration, session list/close/title; two-phase resume e2e.
 - 2026-08-18: Stage 7 merged (#7) — command bridge, /model + effort via llm catalog with
   persisted selection, token-meter usage/context bar.
-- 2026-08-18: Stage 8 — presentation views (diff cards via structuredPatch, terminal/search
-  views), todos rider, tool.generating, resume stats; write-tool diff card e2e.
+- 2026-08-18: Stage 8 merged (#8) — presentation views (diff cards via structuredPatch,
+  terminal/search views), todos rider, tool.generating, resume stats.
+- 2026-08-18: Stage 9 — packaging: install.sh + bin launcher, installed-path e2e via real
+  `dsh plugin add` (in CI), README; v0.1.0.
