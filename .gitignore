@@ -8,3 +8,4 @@ packages/clawcodex-ink/dist/
 *.log
 .DS_Store
 e2e-scratch/
+/.dsh-install-home/

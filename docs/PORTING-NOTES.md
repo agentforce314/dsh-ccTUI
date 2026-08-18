@@ -119,3 +119,17 @@ observed behavior instead of leaving it skipped.
   before the next turn.
 - e2e mock lesson: "has a tool result" must be scoped to messages AFTER the last human
   prompt — the derived history keeps earlier turns' tool results forever.
+
+## Stage 9 — packaging & install
+
+- Distribution is checkout-based: `./install.sh` builds locally then
+  `dsh plugin --profile cc-tui add <checkout>` (a pnpm link install). The bundle's
+  cordis.patch.yml supplies the cc-tui row; module resolution from the linked checkout finds
+  the repo's own node_modules, so the plugin externals resolve without touching the profile.
+- `bin/dsh-cc-tui.js` is a thin launcher (probe dsh, verify the profile, exec
+  `dsh --profile cc-tui` with NODE_ENV=production).
+- The installed path has its own e2e (`npm run e2e:install`, in CI): scratch DSH_HOME,
+  real `dsh plugin add`, boot with only a mock-LLM overlay patch, one streamed turn.
+- Not ported (backend never fires them, UI degrades silently): billing/credits, voice,
+  pets gallery (pet RPCs resolve empty), browser progress, worktree exit flow, rollback,
+  memory targets, sudo/secret prompts.

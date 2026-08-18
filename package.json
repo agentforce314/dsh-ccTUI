@@ -1,6 +1,6 @@
 {
   "name": "dsh-cc-tui",
-  "version": "0.1.0-dev",
+  "version": "0.1.0",
   "description": "Claude-Code-style terminal UI for deepseek-harness, ported from clawcodex ui-tui",
   "license": "MIT",
   "repository": {
@@ -24,7 +24,8 @@
     "build": "npm run build:ink && npm run build:plugin",
     "prepare": "npm run build",
     "verify:boundary": "node scripts/verify-boundary.mjs",
-    "e2e": "npm run build && python3 scripts/e2e/run_core.py"
+    "e2e": "npm run build && python3 scripts/e2e/run_core.py",
+    "e2e:install": "npm run build && python3 scripts/e2e/run_install.py"
   },
   "dependencies": {
     "@clawcodex/ink": "file:./packages/clawcodex-ink",
@@ -68,6 +69,7 @@
   },
   "main": "dist/plugin.js",
   "files": [
+    "bin",
     "dist/plugin.js",
     "cordis.patch.yml",
     "README.md",
@@ -86,5 +88,8 @@
     "@deepseek-ai/dsh-session": "^0.1.0-rc.7",
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.7",
     "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "bin": {
+    "dsh-cc-tui": "./bin/dsh-cc-tui.js"
   }
 }
