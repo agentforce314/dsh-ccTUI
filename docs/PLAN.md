@@ -130,5 +130,7 @@ Acceptance: docs merged to `main`.
   plugin; scripted end-to-end turn passes in a PTY e2e (also in CI).
 - 2026-08-18: Stage 5 merged (#5) — gates: approvals (sandbox escalation e2e round-trip),
   user questions, plan review, permission-mode cycle.
-- 2026-08-18: Stage 6 — sessions: live-agent registry, resume/activate with transcript
-  rehydration, session list/close/title; two-phase resume e2e.
+- 2026-08-18: Stage 6 merged (#6) — sessions: live-agent registry, resume/activate with
+  transcript rehydration, session list/close/title; two-phase resume e2e.
+- 2026-08-18: Stage 7 — command bridge (ctx.commands merge/exec), /model + effort via llm
+  catalog with persisted selection, token-meter usage/context bar.

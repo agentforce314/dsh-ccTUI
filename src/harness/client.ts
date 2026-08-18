@@ -130,6 +130,7 @@ export class HarnessGatewayClient extends GatewayClient {
 
     this.attach(handle)
     this.installGates()
+    void this.refreshContextWindow()
     this.harnessReadyResolve()
     this.publishLocalEvent({ session_id: this.sid, type: 'gateway.ready' })
 
@@ -471,7 +472,7 @@ export class HarnessGatewayClient extends GatewayClient {
         reasoning: this.turnReasoning.join('') || undefined,
         session_turns: this.turnCount,
         text: this.turnText.join(''),
-        usage: { ...this.usageTotals }
+        usage: { ...this.usageTotals, ...this.usageSnapshot() }
       },
       session_id: this.sid,
       type: 'message.complete'
@@ -666,6 +667,145 @@ export class HarnessGatewayClient extends GatewayClient {
     }
   }
 
+
+  private harnessCommands(): Array<{ description: string; hint?: string; name: string }> {
+    const agent = this.agent
+    const commands = this.ctx.get('commands') as
+      | { list?: (agent: Agent) => Array<{ description: string; input?: { hint: string }; name: string }> }
+      | undefined
+
+    if (!agent || !commands?.list) {
+      return []
+    }
+
+    try {
+      return commands.list(agent).map(c => ({ description: c.description, hint: c.input?.hint, name: `/${c.name}` }))
+    } catch {
+      return []
+    }
+  }
+
+  private async runHarnessCommand(line: string): Promise<{ output?: string }> {
+    const agent = this.agent
+    const commands = this.ctx.get('commands') as
+      | {
+          execute?: (
+            agent: Agent,
+            line: string,
+            signal: AbortSignal
+          ) => Promise<{ result: { kind: string; text?: string } } | undefined>
+        }
+      | undefined
+
+    if (!agent || !commands?.execute) {
+      throw new Error('commands unavailable')
+    }
+
+    const normalized = line.startsWith('/') ? line : `/${line}`
+    const execution = await commands.execute(agent, normalized, new AbortController().signal)
+
+    if (!execution) {
+      throw new Error(`unknown command: ${normalized.split(/\s+/)[0] ?? ''}`)
+    }
+
+    if (execution.result.kind === 'error') {
+      throw new Error(execution.result.text || 'command failed')
+    }
+
+    return { output: execution.result.text ?? '' }
+  }
+
+  private usageSnapshot(): { context_max?: number; context_percent?: number; context_used?: number } {
+    const agent = this.agent
+    const meter = this.ctx.get('tokenMeter') as
+      | { measure?: (session: Session) => { totalTokens: number } }
+      | undefined
+
+    if (!agent || !meter?.measure) {
+      return {}
+    }
+
+    try {
+      const used = meter.measure(agent.session).totalTokens
+      const max = this.contextWindow
+
+      return {
+        context_max: max,
+        context_percent: max ? Math.min(100, Math.round((used / max) * 100)) : undefined,
+        context_used: used
+      }
+    } catch {
+      return {}
+    }
+  }
+
+  private contextWindow: number | undefined
+
+  private async refreshContextWindow(): Promise<void> {
+    const route = this.selection.current
+
+    if (!route) {
+      return
+    }
+
+    const llm = this.ctx.get('llm') as
+      | { resolveModelInfo?: (p: string, m: string) => Promise<{ context?: { contextWindow?: number } }> }
+      | undefined
+
+    try {
+      const info = await llm?.resolveModelInfo?.(route.provider, route.model)
+
+      this.contextWindow = info?.context?.contextWindow
+    } catch {
+      this.contextWindow = undefined
+    }
+  }
+
+  private async applyModelSwitch(rawValue: string): Promise<{ ok: boolean; provider?: string; value?: string; error?: string }> {
+    const raw = rawValue.trim()
+
+    if (!raw) {
+      return { error: 'no model given', ok: false }
+    }
+
+    let provider = this.selection.current?.provider
+    let model = raw
+
+    const flagMatch = raw.match(/^(\S+)\s+--provider\s+(\S+)$/)
+
+    if (flagMatch) {
+      model = flagMatch[1]!
+      provider = flagMatch[2]!
+    } else if (raw.includes(':')) {
+      const idx = raw.indexOf(':')
+
+      provider = raw.slice(0, idx)
+      model = raw.slice(idx + 1)
+    }
+
+    if (!provider) {
+      return { error: 'no provider selected', ok: false }
+    }
+
+    const route = { model, provider, reasoningEffort: this.selection.current?.reasoningEffort } as ModelRoute
+
+    this.selection.current = route
+    void this.refreshContextWindow()
+
+    const defaults = this.ctx.get('agentDefaultModel') as
+      | { saveSelection?: (next: ModelRoute) => Promise<void> }
+      | undefined
+
+    void defaults?.saveSelection?.(route).catch(() => {})
+
+    if (this.info) {
+      this.info = { ...this.info, model, profile_name: provider }
+      this.publishLocalEvent({ payload: this.info, session_id: this.sid, type: 'session.info' })
+    }
+
+    return { ok: true, provider, value: model }
+  }
+
   // ── RPCs ───────────────────────────────────────────────────────────────
   override request<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T> {
     const p = (params ?? {}) as Record<string, unknown>
@@ -848,12 +988,31 @@ export class HarnessGatewayClient extends GatewayClient {
           }
         }
 
+        for (const c of this.harnessCommands()) {
+          if (canon[c.name]) {
+            continue
+          }
+
+          canon[c.name] = c.name
+          pairs.push([c.name, c.description])
+
+          if (c.hint) {
+            hints[c.name] = c.hint
+          }
+        }
+
         return Promise.resolve({ canon, categories: [], hints, pairs, skill_count: 0, sub: {} } as T)
       }
 
       case 'complete.slash': {
         const text = String(p.text ?? '').toLowerCase() || '/'
-        const items = SLASHES.filter(s => s.name.toLowerCase().startsWith(text)).map(s => ({
+        const entries = [
+          ...SLASHES,
+          ...this.harnessCommands()
+            .filter(c => !SLASHES.some(s => s.name === c.name))
+            .map(c => ({ desc: c.description, hint: c.hint, name: c.name }))
+        ]
+        const items = entries.filter(s => s.name.toLowerCase().startsWith(text)).map(s => ({
           display: s.name,
           hint: s.hint,
           meta: s.desc,
@@ -861,6 +1020,119 @@ export class HarnessGatewayClient extends GatewayClient {
         }))
 
         return Promise.resolve({ items, replace_from: 1 } as T)
+      }
+
+      case 'slash.exec': {
+        const line = String(p.command ?? '').trim()
+        const name = line.split(/\s+/)[0]?.toLowerCase() ?? ''
+        const rest = line.slice(name.length).trim()
+
+        if (name === 'effort') {
+          if (!this.selection.current) {
+            return Promise.reject(new Error('no model selected'))
+          }
+
+          const level = rest || undefined
+
+          this.selection.current = {
+            ...this.selection.current,
+            reasoningEffort: level && level !== 'auto' ? level : undefined
+          } as ModelRoute
+
+          if (this.info) {
+            this.info = { ...this.info, reasoning_effort: this.selection.current.reasoningEffort as string | undefined }
+            this.publishLocalEvent({ payload: this.info, session_id: this.sid, type: 'session.info' })
+          }
+
+          return Promise.resolve({ output: `effort: ${level ?? 'auto'}` } as T)
+        }
+
+        if (name === 'context') {
+          const usage = this.usageSnapshot()
+          const used = usage.context_used ?? 0
+          const max = usage.context_max
+
+          return Promise.resolve({
+            output: max
+              ? `context: ${used.toLocaleString()} of ${max.toLocaleString()} tokens (${usage.context_percent ?? 0}%)`
+              : `context: ~${used.toLocaleString()} tokens used (window unknown)`
+          } as T)
+        }
+
+        return this.runHarnessCommand(line).then(r => r as T)
+      }
+
+      case 'command.dispatch': {
+        const name = String(p.name ?? '').trim()
+        const arg = typeof p.arg === 'string' && p.arg.trim() ? ` ${p.arg.trim()}` : ''
+
+        return this.runHarnessCommand(`${name}${arg}`).then(r => ({ output: r.output, type: 'exec' }) as T)
+      }
+
+      case 'model.options': {
+        return (async () => {
+          const llm = this.ctx.get('llm') as
+            | {
+                listModels?: (provider: string) => Promise<ReadonlyArray<{ id: string }>>
+                listProviders?: () => Array<{ id: string; name: string }>
+              }
+            | undefined
+          const current = this.selection.current
+          const providers = await Promise.all(
+            (llm?.listProviders?.() ?? []).map(async info => {
+              let models: string[] = []
+
+              try {
+                models = ((await llm?.listModels?.(info.id)) ?? []).map(m => m.id)
+              } catch {
+                models = []
+              }
+
+              return {
+                authenticated: true,
+                is_current: info.id === current?.provider,
+                models,
+                name: info.name,
+                slug: info.id,
+                total_models: models.length
+              }
+            })
+          )
+
+          return { model: current?.model, provider: current?.provider, providers } as T
+        })()
+      }
+
+      case 'model.effort_options': {
+        return (async () => {
+          const route = this.selection.current
+
+          if (!route) {
+            return { supported: false } as T
+          }
+
+          const llm = this.ctx.get('llm') as
+            | {
+                resolveModelInfo?: (
+                  p: string,
+                  m: string
+                ) => Promise<{ reasoning?: { defaultEffort?: string; efforts: ReadonlyArray<{ id: string }> } }>
+              }
+            | undefined
+
+          try {
+            const info = await llm?.resolveModelInfo?.(route.provider, route.model)
+            const levels = (info?.reasoning?.efforts ?? []).map(e => e.id)
+
+            return {
+              current: (route.reasoningEffort as string | undefined) ?? '',
+              levels,
+              supported: levels.length > 0
+            } as T
+          } catch {
+            return { supported: false } as T
+          }
+        })()
       }
 
       case 'approval.respond': {
@@ -943,6 +1215,10 @@ export class HarnessGatewayClient extends GatewayClient {
       }
 
       case 'config.set': {
+        if (String(p.key ?? '') === 'model') {
+          return this.applyModelSwitch(String(p.value ?? '')).then(r => r as T)
+        }
+
         if (String(p.key ?? '') === 'permission_mode') {
           const value = String(p.value ?? 'default')
           const mode = value === 'acceptEdits' ? 'default' : value
@@ -959,7 +1235,23 @@ export class HarnessGatewayClient extends GatewayClient {
       case 'complete.path':
         return super.request(method, params)
 
-      case 'session.usage':
+      case 'session.usage': {
+        const usage = this.usageSnapshot()
+
+        return Promise.resolve(
+          {
+            calls: this.usageTotals.calls,
+            context_max: usage.context_max,
+            context_percent: usage.context_percent,
+            context_used: usage.context_used,
+            input: this.usageTotals.input,
+            model: this.selection.current?.model,
+            output: this.usageTotals.output,
+            total: this.usageTotals.total
+          } as T
+        )
+      }
+
       case 'session.status':
       case 'config.get':
       case 'terminal.resize':

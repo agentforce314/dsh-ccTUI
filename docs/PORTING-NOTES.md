@@ -88,3 +88,20 @@ observed behavior instead of leaving it skipped.
   map with agent.status. session.title get/rename via ctx.sessionTitle.
 - e2e is now two-phase: phase 2 boots fresh and `/sessions <fixed-id>` replays phase 1's
   persisted conversation.
+
+## Stage 7 — slash commands, model picker, usage
+
+- commands.catalog / complete.slash now merge `ctx.commands.list(agent)` behind the static
+  SLASHES table (locals win on collisions — a harness command never shadows a built-in).
+- slash.exec: `effort` and `context` are handled in the client (selection.reasoningEffort /
+  tokenMeter snapshot); everything else bridges to `ctx.commands.execute` — note the
+  dsh-commands parseCommand contract requires the LEADING SLASH on the line.
+- config.set model → applyModelSwitch: accepts `model`, `provider:model`, and
+  `model --provider slug`; updates the live selection (installModelSelection ref), persists
+  via agentDefaultModel.saveSelection, refreshes the context window, republishes session.info.
+- model.options / model.effort_options from the ctx.llm advisory catalog + resolveModelInfo.
+- session.usage + message.complete usage now carry context_used/max/percent from
+  tokenMeter.measure + the resolved model context window (drives the context bar).
+- e2e lesson: a bare slash word leaves the completion menu open and Enter ACCEPTS instead of
+  submitting — the PTY driver sends Esc first; and flattened-transcript needles must avoid
+  digits (some glyphs render via absolute cursor positioning and vanish in the flattener).
