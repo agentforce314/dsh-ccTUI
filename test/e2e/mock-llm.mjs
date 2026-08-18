@@ -42,7 +42,31 @@ class MockAdapter extends LlmAdapter {
       m => Array.isArray(m.content) && m.content.some(b => b.type === 'tool-result')
     )
 
-    if (user.includes('USE-TOOL') && !hasToolResult) {
+    if (user.includes('USE-BASH') && !hasToolResult) {
+      const args = JSON.stringify({ command: 'echo e2e-bash-ok', description: 'e2e echo probe', justification: 'e2e approval flow test', sandbox_permissions: 'danger-full-access' })
+
+      yield { blockType: 'tool-call', index: 0, type: 'block-start' }
+      yield { argumentsDelta: args, id: 'mock-bash-1', name: 'bash', type: 'tool-call-delta', index: 0 }
+      yield { block: { arguments: args, id: 'mock-bash-1', name: 'bash', type: 'tool-call' }, index: 0, type: 'block-end' }
+      yield { type: 'usage', usage: { inputTokens: 12, outputTokens: 6 } }
+      yield { reason: { kind: 'tool-calls' }, type: 'finish' }
+
+      return
+    }
+
+    if (hasToolResult) {
+      const text = 'TOOL-STEP-DONE'
+
+      yield { blockType: 'text', index: 0, type: 'block-start' }
+      yield { index: 0, text, type: 'text-delta' }
+      yield { block: { text, type: 'text' }, index: 0, type: 'block-end' }
+      yield { type: 'usage', usage: { inputTokens: 8, outputTokens: 4 } }
+      yield { reason: { kind: 'stop' }, type: 'finish' }
+
+      return
+    }
+
+    if (user.includes('USE-TOOL')) {
       const args = JSON.stringify({ todos: [{ content: 'mock todo item', status: 'pending' }] })
 
       yield { blockType: 'tool-call', index: 0, type: 'block-start' }

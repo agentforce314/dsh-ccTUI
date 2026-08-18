@@ -52,3 +52,24 @@ observed behavior instead of leaving it skipped.
 - The mock adapter must pick the last message with `source.kind === 'user'` — the harness
   injects context (time, instructions) as user-role messages and a naive "last user message"
   echoes those instead of the human prompt.
+
+## Stage 5 — interaction gates
+
+- Approvals: the client is the `approval/request` waterfall answerer for its own agent
+  (delegates other agents via next()). The gated command shown in the box is recovered from
+  the `tool/call` arguments by callId. `allow_permanent` is false — the harness has no
+  persistent grant store, so the "don't ask again" option is hidden and `always` maps to
+  allowed-once if it ever arrives. In the stock dsh-base composition, approvals fire on
+  sandbox escalations (`sandbox_permissions` on bash) rather than on every tool call.
+- Questions: the client registers as the `ctx.userQuestions` provider
+  (DUPLICATE_PROVIDER-tolerant). QuestionSpec has no id, so answers are re-paired by
+  question text; multi-select answers arrive as ', '-joined labels and are split back into
+  selected labels + custom leftovers.
+- Plan review: a single question carrying intent {kind:'plan-review', approve} renders as
+  the clawcodex PlanApprovalPrompt; approve choices answer with the intent's approve label,
+  accept-edits maps to default (no per-category harness equivalent), bypass additionally
+  sets approval policy 'never'; deny answers with the feedback as custom text.
+- Permission modes: Shift+Tab cycles default → plan → bypassPermissions (acceptEdits is
+  omitted — no harness analog). plan drives ctx.planMode.set, bypass drives
+  ctx.approval.setPolicy('never'); 'plan/mode' session events (e.g. the model exiting plan
+  mode) flow back as permission.mode updates.
