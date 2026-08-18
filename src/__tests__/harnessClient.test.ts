@@ -63,6 +63,44 @@ function makeWorld() {
         return { registerProvider: (prov: { ask: (r: unknown) => Promise<unknown> }) => { providers.push(prov); return () => {} } }
       }
 
+      if (name === 'commands') {
+        return {
+          execute: async (_a: unknown, line: string) => {
+            // faithful to dsh-commands: the line must carry the leading slash
+            if (!line.startsWith('/')) {
+              return undefined
+            }
+
+            if (line.startsWith('/mycmd')) {
+              return { result: { kind: 'success', text: `mycmd ran: ${line.slice(1)}` } }
+            }
+
+            if (line.startsWith('/bad')) {
+              return { result: { kind: 'error', text: 'boom' } }
+            }
+
+            return undefined
+          },
+          list: () => [{ description: 'My command', input: { hint: '<text>' }, name: 'mycmd' }]
+        }
+      }
+
+      if (name === 'llm') {
+        return {
+          listModels: async () => [{ id: 'mock-1' }, { id: 'mock-2' }],
+          listProviders: () => [{ id: 'mock', name: 'Mock' }],
+          resolveModelInfo: async () => ({ context: { contextWindow: 64000 }, reasoning: { efforts: [{ id: 'low' }, { id: 'high' }] } })
+        }
+      }
+
+      if (name === 'tokenMeter') {
+        return { measure: () => ({ totalTokens: 3200 }) }
+      }
+
+      if (name === 'agentDefaultModel') {
+        return { currentSelection: () => undefined, saveSelection: async () => {} }
+      }
+
       if (name === 'sessionPersistence') {
         return {
           list: async () => [
@@ -447,5 +485,89 @@ describe('HarnessGatewayClient', () => {
     await w.client.request('session.activate', { session_id: first })
     await expect(w.client.request('session.title', { title: 'My Task' })).resolves.toEqual({ title: 'My Task' })
     await expect(w.client.request('session.title', {})).resolves.toEqual({ title: 'existing title' })
+  })
+
+  it('merges harness commands into the catalog and completions', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+
+    const catalog = await w.client.request<{ canon: Record<string, string>; hints: Record<string, string>; pairs: Array<[string, string]> }>('commands.catalog', {})
+
+    expect(catalog.canon['/mycmd']).toBe('/mycmd')
+    expect(catalog.hints['/mycmd']).toBe('<text>')
+    expect(catalog.pairs.some(([n]) => n === '/mycmd')).toBe(true)
+
+    const completion = await w.client.request<{ items: Array<{ text: string }> }>('complete.slash', { text: '/myc' })
+
+    expect(completion.items.map(i => i.text)).toContain('/mycmd')
+  })
+
+  it('slash.exec bridges to harness commands and errors propagate', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+
+    await expect(w.client.request('slash.exec', { command: 'mycmd ship it' })).resolves.toEqual({ output: 'mycmd ran: mycmd ship it' })
+    await expect(w.client.request('slash.exec', { command: 'bad thing' })).rejects.toThrow('boom')
+    await expect(w.client.request('slash.exec', { command: 'nosuch' })).rejects.toThrow('unknown command')
+    await expect(w.client.request('command.dispatch', { arg: 'x', name: 'mycmd' })).resolves.toEqual({ output: 'mycmd ran: mycmd x', type: 'exec' })
+  })
+
+  it('slash.exec effort updates the live selection and session.info', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    await expect(w.client.request('slash.exec', { command: 'effort high' })).resolves.toEqual({ output: 'effort: high' })
+
+    const info = w.events.find(e => e.type === 'session.info') as Extract<GatewayEvent, { type: 'session.info' }>
+
+    expect(info.payload.reasoning_effort).toBe('high')
+  })
+
+  it('config.set model switches the route and reports provider', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    await expect(w.client.request('config.set', { key: 'model', value: 'mock-2' })).resolves.toMatchObject({
+      ok: true,
+      provider: 'mock',
+      value: 'mock-2'
+    })
+
+    const info = w.events.find(e => e.type === 'session.info') as Extract<GatewayEvent, { type: 'session.info' }>
+
+    expect(info.payload.model).toBe('mock-2')
+
+    const opts = await w.client.request<{ model?: string; providers: Array<{ models: string[]; slug: string }> }>('model.options', {})
+
+    expect(opts.model).toBe('mock-2')
+    expect(opts.providers[0]).toMatchObject({ models: ['mock-1', 'mock-2'], slug: 'mock' })
+
+    const efforts = await w.client.request<{ levels?: string[]; supported?: boolean }>('model.effort_options', {})
+
+    expect(efforts).toMatchObject({ levels: ['low', 'high'], supported: true })
+  })
+
+  it('session.usage serves token-meter derived context numbers', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    await new Promise(resolve => setTimeout(resolve, 5))
+
+    const usage = await w.client.request<{ context_max?: number; context_percent?: number; context_used?: number }>('session.usage', {})
+
+    expect(usage.context_used).toBe(3200)
+    expect(usage.context_max).toBe(64000)
+    expect(usage.context_percent).toBe(5)
   })
 })

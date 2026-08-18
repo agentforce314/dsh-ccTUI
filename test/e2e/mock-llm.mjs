@@ -8,7 +8,7 @@
 import { LlmAdapter } from '@deepseek-ai/dsh-llm'
 
 export const name = 'mock-llm'
-export const inject = ['llm']
+export const inject = ['llm', 'commands']
 
 const lastUserText = messages => {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -95,4 +95,11 @@ class MockAdapter extends LlmAdapter {
 
 export function apply(ctx) {
   ctx.llm.registerAdapter(['mock'], new MockAdapter())
+
+  // A harness-registered slash command for the command-bridge e2e.
+  ctx.commands.register({
+    description: 'e2e bridge probe',
+    handler: () => ({ kind: 'success', text: 'EPROBE-BRIDGE-OK' }),
+    name: 'e2eprobe'
+  })
 }

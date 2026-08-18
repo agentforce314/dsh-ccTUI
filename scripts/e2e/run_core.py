@@ -178,6 +178,11 @@ class TuiSession:
     def type_line(self, text: bytes) -> None:
         self.send(text)
         self.drain(0.5)
+        if text.startswith(b"/"):
+            # a bare slash word opens the completion menu, whose Enter ACCEPTS
+            # instead of submitting; Esc dismisses it first
+            self.send(b"\x1b")
+            self.drain(0.3)
         self.send(b"\r")
 
     def finish(self, quit_first: bool = True) -> None:
@@ -226,6 +231,15 @@ def phase1(failures: list[str]) -> None:
             if not s.read_until(["TOOL-STEP-DONE"], 45):
                 failures.append("p1: bash turn never completed after approval")
         s.drain(1.5)
+        # harness command bridge
+        s.type_line(b"/e2eprobe")
+        if not s.read_until(["EPROBE-BRIDGE-OK"], 20):
+            failures.append("p1: harness command bridge failed")
+        # live model switch reflects in the stats line
+        s.type_line(b"/model mock-2")
+        if not s.read_until(["mock-2"], 20):
+            failures.append("p1: model switch never reflected")
+        s.drain(1.0)
     finally:
         s.finish()
     flat = s.flat()
@@ -234,6 +248,8 @@ def phase1(failures: list[str]) -> None:
         ("p1 mock reply streamed", "MOCK-REPLY: hello harness" in flat),
         ("p1 approval prompt shown", "Yes" in flat and "bash" in flat),
         ("p1 approved tool ran to completion", "TOOL-STEP-DONE" in flat),
+        ("p1 harness command bridged", "EPROBE-BRIDGE-OK" in flat),
+        ("p1 model switch reflected", "mock-2" in flat),
         ("p1 no unhandled errors", "Unhandled" not in flat and "harness agent failed" not in flat),
     ]:
         print(f"  {'PASS' if ok else 'FAIL'}  {label}")
