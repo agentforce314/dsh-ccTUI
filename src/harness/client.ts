@@ -18,7 +18,9 @@ import type { AskUserQuestionAnswer, AskUserQuestionItem, AskUserQuestionRequest
 import type {} from '@deepseek-ai/dsh-plan-mode'
 
 import { GatewayClient, SLASHES } from '../gatewayClient.js'
-import type { GatewayTranscriptMessage } from '../gatewayTypes.js'
+import { structuredPatch } from 'diff'
+
+import type { GatewayTranscriptMessage, StructuredDiffPayload } from '../gatewayTypes.js'
 import type { SessionInfo, Usage } from '../types.js'
 
 export interface HarnessClientOptions {
@@ -96,6 +98,9 @@ export class HarnessGatewayClient extends GatewayClient {
   private turnCount = 0
   private permissionMode = 'default'
   private callArgs = new Map<string, string>()
+  private callRawArgs = new Map<string, string>()
+  private pendingTodos: unknown[] | null = null
+  private generatingAnnounced = new Set<string>()
   private gateApproval: { resolve: (o: ApprovalOutcome) => void } | null = null
   private gateQuestion: {
     items: AskUserQuestionItem[]
@@ -365,6 +370,7 @@ export class HarnessGatewayClient extends GatewayClient {
         this.callNames.set(id, name)
         this.callStarted.set(id, Date.now())
         this.callArgs.set(id, prettyArgs(rawArgs))
+        this.callRawArgs.set(id, rawArgs)
         this.publishLocalEvent({
           payload: { args_text: prettyArgs(rawArgs), name, tool_id: id },
           session_id: this.sid,
@@ -374,29 +380,39 @@ export class HarnessGatewayClient extends GatewayClient {
       }
 
       case 'tool/result': {
-        const { message, error } = (event as SessionEvent<'tool/result'>).data
+        const { message, error, meta } = (event as SessionEvent<'tool/result'>).data
         const block = message.content[0]
         const id = String(block.toolCallId)
-        const resultText = textOf(block.content, ['text'])
         const startedAt = this.callStarted.get(id)
+        const view = this.presentResult(id, block.content, Boolean(block.isError), meta)
+        const todos = this.pendingTodos
 
+        this.pendingTodos = null
         this.publishLocalEvent({
           payload: {
             duration_s: startedAt ? Math.max(0, Date.now() - startedAt) / 1000 : undefined,
-            error: error ? `${error.name}: ${error.code}` : block.isError ? resultText || 'tool failed' : undefined,
+            error: error ? `${error.name}: ${error.code}` : block.isError ? view.resultText || 'tool failed' : undefined,
             name: this.callNames.get(id),
-            result_text: resultText,
+            result_text: view.resultText,
+            structured_diff: view.structuredDiff,
+            todos: todos ?? undefined,
             tool_id: id
           },
           session_id: this.sid,
           type: 'tool.complete'
         })
         this.callStarted.delete(id)
+        this.generatingAnnounced.delete(id)
         break
       }
 
       case 'turn/end': {
         this.finishTurn()
+        break
+      }
+
+      case 'todo/write': {
+        this.pendingTodos = (event as SessionEvent<'todo/write'>).data.todos as unknown[]
         break
       }
 
@@ -439,6 +455,17 @@ export class HarnessGatewayClient extends GatewayClient {
         }
 
         this.publishLocalEvent({ payload: { text: chunk.text }, session_id: this.sid, type: 'thinking.delta' })
+        break
+      }
+
+      case 'tool-call-delta': {
+        const id = String(chunk.id)
+
+        if (chunk.name && !this.generatingAnnounced.has(id)) {
+          this.generatingAnnounced.add(id)
+          this.publishLocalEvent({ payload: { name: chunk.name }, session_id: this.sid, type: 'tool.generating' })
+        }
+
         break
       }
 
@@ -590,6 +617,101 @@ export class HarnessGatewayClient extends GatewayClient {
     }
 
     this.publishLocalEvent({ payload: { mode }, session_id: this.sid, type: 'permission.mode' })
+  }
+
+
+  /** Refine a tool result through the tool's own presentation view. */
+  private presentResult(
+    callId: string,
+    content: readonly ContentBlock[],
+    isError: boolean,
+    meta: unknown
+  ): { resultText: string; structuredDiff?: StructuredDiffPayload } {
+    const fallback = textOf(content, ['text'])
+    const name = this.callNames.get(callId)
+    const rawArgs = this.callRawArgs.get(callId)
+
+    this.callRawArgs.delete(callId)
+
+    if (!name) {
+      return { resultText: fallback }
+    }
+
+    let view: { card?: string } | undefined
+
+    try {
+      const tools = this.ctx.get('tools') as
+        | { get?: (n: string, scope?: unknown) => { presentResult?: (a: unknown, r: unknown) => unknown } | undefined }
+        | undefined
+      const definition = tools?.get?.(name, this.agent as unknown)
+      let args: unknown
+
+      try {
+        args = rawArgs ? JSON.parse(rawArgs) : undefined
+      } catch {
+        args = undefined
+      }
+
+      view = definition?.presentResult?.(args, { content: [...content], isError, meta }) as { card?: string } | undefined
+    } catch {
+      view = undefined
+    }
+
+    if (!view) {
+      return { resultText: fallback }
+    }
+
+    if (view.card === 'diff') {
+      const diffs = (view as { diffs?: Array<{ newText: string; oldText: null | string; path: string }> }).diffs ?? []
+      const first = diffs[0]
+
+      if (first) {
+        const patch = structuredPatch(first.path, first.path, first.oldText ?? '', first.newText, '', '', { context: 3 })
+        const structuredDiff: StructuredDiffPayload = {
+          filePath: first.path,
+          hunks: patch.hunks.map(h => ({
+            lines: h.lines,
+            newLines: h.newLines,
+            newStart: h.newStart,
+            oldLines: h.oldLines,
+            oldStart: h.oldStart
+          })),
+          kind: first.oldText === null ? 'create' : 'update'
+        }
+
+        if (first.oldText === null) {
+          structuredDiff.content = first.newText
+          structuredDiff.firstLine = first.newText.split(String.fromCharCode(10))[0] ?? null
+        }
+
+        const extra = diffs.length > 1 ? ` (+${diffs.length - 1} more file${diffs.length > 2 ? 's' : ''})` : ''
+
+        return { resultText: fallback || `updated ${first.path}${extra}`, structuredDiff }
+      }
+    }
+
+    if (view.card === 'terminal') {
+      const terminal = view as { exitCode?: number; output?: string }
+      const lines = [terminal.output ?? '']
+
+      if (typeof terminal.exitCode === 'number' && terminal.exitCode !== 0) {
+        lines.push(`[exit code: ${terminal.exitCode}]`)
+      }
+
+      const output = lines.filter(Boolean).join(String.fromCharCode(10))
+
+      return { resultText: output || fallback }
+    }
+
+    if (view.card === 'search') {
+      const search = view as { paths?: string[]; total?: number }
+
+      if (Array.isArray(search.paths)) {
+        return { resultText: search.paths.join(String.fromCharCode(10)) || fallback }
+      }
+    }
+
+    return { resultText: fallback }
   }
 
   // ── outbound ───────────────────────────────────────────────────────────
@@ -879,6 +1001,7 @@ export class HarnessGatewayClient extends GatewayClient {
           const running = handle.agent.status === 'running'
 
           this.publishLocalEvent({ payload: this.info!, session_id: this.sid, type: 'session.info' })
+          this.publishLocalEvent({ payload: { session_turns: this.turnCount }, session_id: this.sid, type: 'session.stats' })
 
           return {
             info: this.info ?? undefined,

@@ -132,5 +132,7 @@ Acceptance: docs merged to `main`.
   user questions, plan review, permission-mode cycle.
 - 2026-08-18: Stage 6 merged (#6) — sessions: live-agent registry, resume/activate with
   transcript rehydration, session list/close/title; two-phase resume e2e.
-- 2026-08-18: Stage 7 — command bridge (ctx.commands merge/exec), /model + effort via llm
-  catalog with persisted selection, token-meter usage/context bar.
+- 2026-08-18: Stage 7 merged (#7) — command bridge, /model + effort via llm catalog with
+  persisted selection, token-meter usage/context bar.
+- 2026-08-18: Stage 8 — presentation views (diff cards via structuredPatch, terminal/search
+  views), todos rider, tool.generating, resume stats; write-tool diff card e2e.

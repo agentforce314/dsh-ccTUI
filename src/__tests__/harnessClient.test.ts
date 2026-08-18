@@ -48,7 +48,20 @@ function makeWorld() {
     },
     get: (name: string) => {
       if (name === 'tools') {
-        return { schemas: () => [{ name: 'bash' }, { name: 'read' }] }
+        return {
+          get: (toolName: string) =>
+            toolName === 'write'
+              ? {
+                  presentResult: (_args: unknown, result: { isError: boolean }) =>
+                    result.isError
+                      ? undefined
+                      : { card: 'diff', diffs: [{ newText: 'line one\nline two\n', oldText: null, path: 'notes.txt' }] }
+                }
+              : toolName === 'bash'
+                ? { presentResult: () => ({ card: 'terminal', exitCode: 0, output: 'ran fine' }) }
+                : undefined,
+          schemas: () => [{ name: 'bash' }, { name: 'read' }]
+        }
       }
 
       if (name === 'approval') {
@@ -204,7 +217,7 @@ describe('HarnessGatewayClient', () => {
 
     const toolDone = w.events[5] as Extract<GatewayEvent, { type: 'tool.complete' }>
 
-    expect(toolDone.payload).toMatchObject({ name: 'bash', result_text: 'file.txt', tool_id: 'c1' })
+    expect(toolDone.payload).toMatchObject({ name: 'bash', result_text: 'ran fine', tool_id: 'c1' })
     expect(toolDone.payload.error).toBeUndefined()
 
     const complete = w.events[6] as Extract<GatewayEvent, { type: 'message.complete' }>
@@ -569,5 +582,63 @@ describe('HarnessGatewayClient', () => {
     expect(usage.context_used).toBe(3200)
     expect(usage.context_max).toBe(64000)
     expect(usage.context_percent).toBe(5)
+  })
+
+  it('converts diff presentation views into structured_diff payloads', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    w.fire('turn/start', { turn: 1 })
+    w.fire('tool/call', { arguments: '{"file_path":"notes.txt","content":"line one\\nline two\\n"}', callId: 'w1', name: 'write', step: 1, turn: 1 })
+    w.fire('tool/result', {
+      message: { content: [{ content: [{ text: 'wrote notes.txt', type: 'text' }], toolCallId: 'w1', type: 'tool-result' }] },
+      step: 1,
+      turn: 1
+    })
+
+    const done = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
+
+    expect(done.type).toBe('tool.complete')
+    expect(done.payload.structured_diff).toMatchObject({ filePath: 'notes.txt', kind: 'create' })
+    expect(done.payload.structured_diff?.hunks[0]?.lines).toEqual(['+line one', '+line two'])
+  })
+
+  it('renders terminal presentation views and attaches pending todos', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    w.fire('turn/start', { turn: 1 })
+    w.fire('tool/call', { arguments: '{"command":"true","description":"noop"}', callId: 'b1', name: 'bash', step: 1, turn: 1 })
+    w.fire('todo/write', { todos: [{ content: 'first thing', status: 'pending' }] })
+    w.fire('tool/result', {
+      message: { content: [{ content: [{ text: 'raw', type: 'text' }], toolCallId: 'b1', type: 'tool-result' }] },
+      step: 1,
+      turn: 1
+    })
+
+    const done = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
+
+    expect(done.payload.result_text).toBe('ran fine')
+    expect(done.payload.todos).toEqual([{ content: 'first thing', status: 'pending' }])
+  })
+
+  it('announces tool.generating once per streamed call id', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    w.fire('turn/start', { turn: 1 })
+    w.fire('assistant/chunk', { chunk: { argumentsDelta: '{', id: 'g1', index: 0, name: 'bash', type: 'tool-call-delta' }, step: 1, turn: 1 })
+    w.fire('assistant/chunk', { chunk: { argumentsDelta: '}', id: 'g1', index: 0, name: 'bash', type: 'tool-call-delta' }, step: 1, turn: 1 })
+
+    expect(w.events.filter(e => e.type === 'tool.generating')).toHaveLength(1)
   })
 })

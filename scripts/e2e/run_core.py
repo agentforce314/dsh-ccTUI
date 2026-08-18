@@ -231,6 +231,12 @@ def phase1(failures: list[str]) -> None:
             if not s.read_until(["TOOL-STEP-DONE"], 45):
                 failures.append("p1: bash turn never completed after approval")
         s.drain(1.5)
+        # diff card: fs write tool creates a file, the transcript shows the card
+        s.type_line(b"please USE-WRITE now")
+        if not s.read_until(["Wrote", "alpha", "TOOL-STEP-DONE"], 45):
+            failures.append("p1: write tool turn never rendered")
+        s.read_until(["TOOL-STEP-DONE"], 30)
+        s.drain(1.0)
         # harness command bridge
         s.type_line(b"/e2eprobe")
         if not s.read_until(["EPROBE-BRIDGE-OK"], 20):
@@ -249,6 +255,7 @@ def phase1(failures: list[str]) -> None:
         ("p1 approval prompt shown", "Yes" in flat and "bash" in flat),
         ("p1 approved tool ran to completion", "TOOL-STEP-DONE" in flat),
         ("p1 harness command bridged", "EPROBE-BRIDGE-OK" in flat),
+        ("p1 write diff card rendered", ("Wrote" in flat or "Added" in flat) and "alpha" in flat),
         ("p1 model switch reflected", "mock-2" in flat),
         ("p1 no unhandled errors", "Unhandled" not in flat and "harness agent failed" not in flat),
     ]:

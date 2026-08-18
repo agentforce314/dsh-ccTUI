@@ -105,3 +105,17 @@ observed behavior instead of leaving it skipped.
 - e2e lesson: a bare slash word leaves the completion menu open and Enter ACCEPTS instead of
   submitting — the PTY driver sends Esc first; and flattened-transcript needles must avoid
   digits (some glyphs render via absolute cursor positioning and vanish in the flattener).
+
+## Stage 8 — rich rendering & telemetry
+
+- tool/result now routes through the owning tool's presentResult view: diff views convert
+  to StructuredDiffPayload via jsdiff structuredPatch (create → content + firstLine; multi-
+  file diffs render the first + a "+N more" note), terminal views render output + exit code,
+  search path views join paths; everything else falls back to the raw text blocks.
+- todo/write snapshots stash and ride the next tool.complete's `todos` (the todo_write tool
+  completes immediately after, which is where the clawcodex TodoPanel reads them).
+- tool-call-delta chunks announce tool.generating once per call id.
+- session.stats {session_turns} publishes after resume/activate so the odometer is right
+  before the next turn.
+- e2e mock lesson: "has a tool result" must be scoped to messages AFTER the last human
+  prompt — the derived history keeps earlier turns' tool results forever.
