@@ -1,0 +1,416 @@
+import {
+  LIVE_RENDER_MAX_CHARS,
+  LIVE_RENDER_MAX_LINES,
+  THINKING_COT_MAX,
+  VERBOSE_TRAIL_MAX_CHARS,
+  VERBOSE_TRAIL_MAX_LINES
+} from '../config/limits.js'
+import { VERBS } from '../content/verbs.js'
+import type { ThinkingMode } from '../types.js'
+
+const ESC = String.fromCharCode(27)
+const BEL = String.fromCharCode(7)
+const ANSI_CSI_RE = new RegExp(`${ESC}\\[[0-?]*[ -/]*[@-~]`, 'g')
+const ANSI_CSI_WITH_CMD_RE = new RegExp(`${ESC}\\[[0-?]*[ -/]*([@-~])`, 'g')
+const ANSI_INCOMPLETE_CSI_RE = new RegExp(`${ESC}\\[[0-?]*[ -/]*(?=${ESC}|\\n|$)`, 'g')
+const ANSI_OSC_RE = new RegExp(`${ESC}\\][\\s\\S]*?(?:${BEL}|${ESC}\\\\)`, 'g')
+const ANSI_STRING_RE = new RegExp(`${ESC}[PX^_][\\s\\S]*?(?:${BEL}|${ESC}\\\\)`, 'g')
+const ANSI_NON_CSI_ESC_SEQ_RE = new RegExp(`${ESC}(?!\\[|\\]|P|X|\\^|_)[ -/]*[0-~]`, 'g')
+const ANSI_STRAY_ESC_RE = new RegExp(`${ESC}(?!\\[)[\\s\\S]?`, 'g')
+// eslint-disable-next-line no-control-regex -- intentionally strips C0/C1 control chars
+const CONTROL_RE = /[\x00-\x08\x0B\x0C\x0D\x0E-\x1A\x1C-\x1F\x7F]/g
+const WS_RE = /\s+/g
+
+export const stripAnsi = (s: string) =>
+  s
+    .replace(ANSI_OSC_RE, '')
+    .replace(ANSI_STRING_RE, '')
+    .replace(ANSI_INCOMPLETE_CSI_RE, '')
+    .replace(ANSI_CSI_RE, '')
+    .replace(ANSI_INCOMPLETE_CSI_RE, '')
+    .replace(ANSI_NON_CSI_ESC_SEQ_RE, '')
+    .replace(ANSI_STRAY_ESC_RE, '')
+    .replace(CONTROL_RE, '')
+
+export const sanitizeAnsiForRender = (s: string) =>
+  s
+    .replace(ANSI_OSC_RE, '')
+    .replace(ANSI_STRING_RE, '')
+    .replace(ANSI_INCOMPLETE_CSI_RE, '')
+    .replace(ANSI_CSI_WITH_CMD_RE, (seq, cmd: string) => (cmd === 'm' ? seq : ''))
+    .replace(ANSI_INCOMPLETE_CSI_RE, '')
+    .replace(ANSI_NON_CSI_ESC_SEQ_RE, '')
+    .replace(ANSI_STRAY_ESC_RE, '')
+    .replace(CONTROL_RE, '')
+
+export const hasAnsi = (s: string) => s.includes(ESC)
+
+const renderEstimateLine = (line: string) => {
+  const trimmed = line.trim()
+
+  if (trimmed.startsWith('|')) {
+    return trimmed
+      .split('|')
+      .filter(Boolean)
+      .map(cell => cell.trim())
+      .join('  ')
+  }
+
+  return line
+    .replace(/!\[(.*?)\]\(([^)\s]+)\)/g, '[image: $1]')
+    .replace(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/(?<!\w)__(.+?)__(?!\w)/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/(?<!\w)_(.+?)_(?!\w)/g, '$1')
+    .replace(/~~(.+?)~~/g, '$1')
+    .replace(/==(.+?)==/g, '$1')
+    .replace(/\[\^([^\]]+)\]/g, '[$1]')
+    .replace(/^#{1,6}\s+/, '')
+    .replace(/^\s*[-*+]\s+\[( |x|X)\]\s+/, (_m, checked: string) => `• [${checked.toLowerCase() === 'x' ? 'x' : ' '}] `)
+    .replace(/^\s*[-*+]\s+/, '• ')
+    .replace(/^\s*(\d+)\.\s+/, '$1. ')
+    .replace(/^\s*(?:>\s*)+/, '│ ')
+}
+
+export const compactPreview = (s: string, max: number) => {
+  const one = s.replace(WS_RE, ' ').trim()
+
+  return !one ? '' : one.length > max ? one.slice(0, max - 1) + '…' : one
+}
+
+export const estimateTokensRough = (text: string) => (!text ? 0 : (text.length + 3) >> 2)
+
+export const edgePreview = (s: string, head = 16, tail = 28) => {
+  const one = s.replace(WS_RE, ' ').trim().replace(/\]\]/g, '] ]')
+
+  return !one
+    ? ''
+    : one.length <= head + tail + 4
+      ? one
+      : `${one.slice(0, head).trimEnd()}.. ${one.slice(-tail).trimStart()}`
+}
+
+export const pasteTokenLabel = (text: string, lineCount: number) => {
+  const preview = edgePreview(text)
+
+  if (!preview) {
+    return `[[ [${fmtK(lineCount)} lines] ]]`
+  }
+
+  const [head = preview, tail = ''] = preview.split('.. ', 2)
+
+  return tail
+    ? `[[ ${head.trimEnd()}.. [${fmtK(lineCount)} lines] .. ${tail.trimStart()} ]]`
+    : `[[ ${preview} [${fmtK(lineCount)} lines] ]]`
+}
+
+const THINKING_STATUS_RE = new RegExp(`^(?:${VERBS.join('|')})\\.{0,3}$`, 'i')
+const THINKING_STATUS_CHUNK_RE = new RegExp(`[^A-Za-z\n]+\\s*(?:${VERBS.join('|')})\\.{0,3}\\s*`, 'giu')
+
+export const cleanThinkingText = (reasoning: string) =>
+  reasoning
+    .split('\n')
+    .map(line => line.replace(THINKING_STATUS_CHUNK_RE, '').trim())
+    .filter(line => line && !THINKING_STATUS_RE.test(line.replace(/\.\.\.$/, '').trim()))
+    .join('\n')
+    .replace(/([^\n])(?=\*\*[^*\n][^\n]*?\*\*)/g, '$1\n\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+export const thinkingPreview = (reasoning: string, mode: ThinkingMode, max: number = THINKING_COT_MAX) => {
+  const raw = cleanThinkingText(reasoning)
+
+  return !raw || mode === 'collapsed' ? '' : mode === 'full' ? raw : compactPreview(raw.replace(WS_RE, ' '), max)
+}
+
+export const boundedLiveRenderText = (
+  text: string,
+  { maxChars = LIVE_RENDER_MAX_CHARS, maxLines = LIVE_RENDER_MAX_LINES } = {}
+) => boundedRenderText(text, 'showing live tail', { maxChars, maxLines })
+
+const boundedRenderText = (
+  text: string,
+  labelPrefix: string,
+  { maxChars, maxLines }: { maxChars: number; maxLines: number }
+) => {
+  if (text.length <= maxChars && text.split('\n', maxLines + 1).length <= maxLines) {
+    return text
+  }
+
+  let start = 0
+  let idx = text.length
+
+  for (let seen = 0; seen < maxLines && idx > 0; seen++) {
+    idx = text.lastIndexOf('\n', idx - 1)
+    start = idx < 0 ? 0 : idx + 1
+
+    if (idx < 0) {
+      break
+    }
+  }
+
+  const lineStart = start
+  start = Math.max(lineStart, text.length - maxChars)
+
+  if (start > lineStart) {
+    const nextBreak = text.indexOf('\n', start)
+
+    if (nextBreak >= 0 && nextBreak < text.length - 1) {
+      start = nextBreak + 1
+    }
+  }
+
+  const tail = text.slice(start).trimStart()
+  const omittedLines = countNewlines(text, start)
+  const omittedChars = Math.max(0, text.length - tail.length)
+
+  const label =
+    omittedLines > 0
+      ? `[${labelPrefix}; omitted ${fmtK(omittedLines)} lines / ${fmtK(omittedChars)} chars]\n`
+      : `[${labelPrefix}; omitted ${fmtK(omittedChars)} chars]\n`
+
+  return `${label}${tail}`
+}
+
+const countNewlines = (text: string, end: number) => {
+  let count = 0
+
+  for (let i = 0; i < end; i++) {
+    if (text.charCodeAt(i) === 10) {
+      count++
+    }
+  }
+
+  return count
+}
+
+export const stripTrailingPasteNewlines = (text: string) => (/[^\n]/.test(text) ? text.replace(/\n+$/, '') : text)
+
+export const toolTrailLabel = (name: string) =>
+  name
+    .split('_')
+    .filter(Boolean)
+    .map(p => p[0]!.toUpperCase() + p.slice(1))
+    .join(' ') || name
+
+export const formatToolCall = (name: string, context = '') => {
+  const label = toolTrailLabel(name)
+  const preview = compactPreview(context, 64)
+
+  return preview ? `${label}(${preview})` : label
+}
+
+// Hard safety cap on shelf details — per-tool formatting upstream already
+// trims to CC's limits (Bash 3 + hint, errors 10 + hint); this only guards a
+// runaway caller from ballooning the render tree.
+const TRAIL_DETAIL_MAX_LINES = 12
+
+export const buildToolTrailLine = (
+  name: string,
+  context: string,
+  error?: boolean,
+  note?: string,
+  // Kept for call-site compatibility; the original Claude Code transcript
+  // never shows durations on the tool line, so neither do we (verbose rows
+  // still carry them via buildVerboseToolTrailLine).
+  _duration?: number
+) => {
+  const raw = (note ?? '').trim()
+  const lines = raw.split('\n')
+
+  const detail = (lines.length > TRAIL_DETAIL_MAX_LINES
+    ? [...lines.slice(0, TRAIL_DETAIL_MAX_LINES), '…']
+    : lines
+  )
+    .join('\n')
+    .trim()
+
+  return `${formatToolCall(name, context)}${detail ? ` :: ${detail}` : ''} ${error ? '✗' : '✓'}`
+}
+
+// Head-truncate an expandable tool block: keep the FIRST maxLines/maxChars —
+// the start of Grep matches, Bash output, or an error is what the reader wants
+// when they hit ctrl+o — with a trailing "… +N lines/chars omitted" marker.
+// (boundedLiveRenderText keeps the *tail* with a "showing live tail" label,
+// which is right for the live stream but wrong and misleading here.)
+const headTruncate = (body: string): string => {
+  const lines = body.split('\n')
+  const overLines = lines.length > VERBOSE_TRAIL_MAX_LINES
+  let head = overLines ? lines.slice(0, VERBOSE_TRAIL_MAX_LINES).join('\n') : body
+  let omittedChars = body.length - head.length
+
+  if (head.length > VERBOSE_TRAIL_MAX_CHARS) {
+    omittedChars = body.length - VERBOSE_TRAIL_MAX_CHARS
+    head = head.slice(0, VERBOSE_TRAIL_MAX_CHARS)
+  }
+
+  if (!overLines && omittedChars <= 0) {
+    return body
+  }
+
+  // Count newlines in the OMITTED suffix (total − kept), not the kept head —
+  // body.length - omittedChars === head.length, so counting to there would
+  // report the head's line count (a constant ~cap) instead of what was dropped.
+  const omittedLines = countNewlines(body, body.length) - countNewlines(body, body.length - omittedChars)
+
+  const marker =
+    omittedLines > 0
+      ? `\n… +${fmtK(omittedLines)} lines omitted`
+      : `\n… +${fmtK(omittedChars)} chars omitted`
+
+  return head.replace(/\n+$/, '') + marker
+}
+
+const verboseToolBlock = (label: string, text?: string) => {
+  const body = (text ?? '').trim()
+
+  // Expandable blocks render only behind ctrl+o (not expanded-by-default), so
+  // the cap is a real expansion (VERBOSE_TRAIL_MAX_CHARS = 16k) that still
+  // bounds the worst case — a burst of huge results can't rebuild the #34095
+  // OOM. Head-truncated: the start of the output is what the reader wants.
+  return body ? `${label}:\n${headTruncate(body)}` : ''
+}
+
+export const buildVerboseToolTrailLine = (
+  name: string,
+  context: string,
+  error?: boolean,
+  duration?: number,
+  argsText?: string,
+  resultText?: string
+) => {
+  const detail = [verboseToolBlock('Args', argsText), verboseToolBlock(error ? 'Error' : 'Result', resultText)]
+    .filter(Boolean)
+    .join('\n')
+
+  const took = duration !== undefined ? ` (${duration.toFixed(1)}s)` : ''
+
+  return `${formatToolCall(name, context)}${took}${detail ? ` :: ${detail}` : ''} ${error ? '✗' : '✓'}`
+}
+
+export const isToolTrailResultLine = (line: string) => line.endsWith(' ✓') || line.endsWith(' ✗')
+
+export const parseToolTrailResultLine = (line: string) => {
+  if (!isToolTrailResultLine(line)) {
+    return null
+  }
+
+  const mark = line.endsWith(' ✗') ? '✗' : '✓'
+  const body = line.slice(0, -2)
+  // The call part is always single-line (`Label(args…)` with compacted args);
+  // details may span lines. Prefer the `) :: ` boundary so a command that
+  // itself contains ` :: ` can't mis-split; otherwise search the first line.
+  const parenSep = body.indexOf(') :: ')
+  const firstLine = body.indexOf('\n') === -1 ? body : body.slice(0, body.indexOf('\n'))
+  const sep = parenSep >= 0 ? parenSep + 1 : firstLine.indexOf(' :: ')
+
+  if (sep >= 0) {
+    return { call: body.slice(0, sep), detail: body.slice(sep + 4), mark }
+  }
+
+  const legacy = body.indexOf(': ')
+
+  if (legacy > 0) {
+    return { call: body.slice(0, legacy), detail: body.slice(legacy + 2), mark }
+  }
+
+  return { call: body, detail: '', mark }
+}
+
+export const splitToolDuration = (call: string) => {
+  const match = call.match(/^(.*?)( \(\d+(?:\.\d)?s\))$/)
+
+  return match ? { label: match[1]!, duration: match[2]! } : { label: call, duration: '' }
+}
+
+export const isTransientTrailLine = (line: string) => line.startsWith('drafting ') || line === 'analyzing tool output…'
+
+export const sameToolTrailGroup = (label: string, entry: string) =>
+  entry === `${label} ✓` ||
+  entry === `${label} ✗` ||
+  entry.startsWith(`${label}(`) ||
+  entry.startsWith(`${label} ::`) ||
+  entry.startsWith(`${label}:`)
+
+export const lastCotTrailIndex = (trail: readonly string[]) => {
+  for (let i = trail.length - 1; i >= 0; i--) {
+    if (!isToolTrailResultLine(trail[i]!)) {
+      return i
+    }
+  }
+
+  return -1
+}
+
+export const estimateRows = (text: string, w: number, compact = false) => {
+  let fence: { char: '`' | '~'; len: number } | null = null
+  let rows = 0
+
+  for (const raw of text.split('\n')) {
+    const line = stripAnsi(raw)
+    const maybeFence = line.match(/^\s*(`{3,}|~{3,})(.*)$/)
+
+    if (maybeFence) {
+      const marker = maybeFence[1]!
+      const lang = maybeFence[2]!.trim()
+
+      if (!fence) {
+        fence = { char: marker[0] as '`' | '~', len: marker.length }
+
+        if (lang) {
+          rows += Math.ceil((`─ ${lang}`.length || 1) / w)
+        }
+      } else if (marker[0] === fence.char && marker.length >= fence.len) {
+        fence = null
+      }
+
+      continue
+    }
+
+    const inCode = Boolean(fence)
+    const trimmed = line.trim()
+
+    if (!inCode && trimmed.startsWith('|') && /^[|\s:-]+$/.test(trimmed)) {
+      continue
+    }
+
+    const rendered = inCode ? line : renderEstimateLine(line)
+
+    if (compact && !rendered.trim()) {
+      continue
+    }
+
+    rows += Math.ceil((rendered.length || 1) / w)
+  }
+
+  return Math.max(1, rows)
+}
+
+/**
+ * Render an unanswered clarify prompt (timed out, or cancelled with Esc/Ctrl+C)
+ * as a persistent transcript block.  The live `ClarifyPrompt` overlay is torn
+ * down the moment the turn settles, so without this the question + options
+ * vanish from the screen while the agent's follow-up still refers to "the
+ * options above".  Mirrors the option formatting in ClarifyPrompt (the same
+ * 1-based numbered list) so the persisted record reads identically to what was
+ * on screen.  `reason` states why the prompt ended ("timed out", "cancelled").
+ */
+export const formatAbandonedClarify = (question: string, choices: string[] | null, reason: string) => {
+  const head = `ask ${question.trim()}`
+  const opts = (choices ?? []).map((c, i) => `  ${i + 1}. ${c}`)
+
+  return [head, ...opts, `  (${reason} — no selection)`].join('\n')
+}
+
+export const flat = (r: Record<string, string[]>) => Object.values(r).flat()
+
+const COMPACT_NUMBER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1, notation: 'compact' })
+
+export const fmtK = (n: number) => COMPACT_NUMBER.format(n).replace(/[KMBT]$/, s => s.toLowerCase())
+
+export const pick = <T>(a: T[]) => a[Math.floor(Math.random() * a.length)]!
+
+export const isPasteBackedText = (text: string) =>
+  /\[\[paste:\d+(?:[^\n]*?)\]\]|\[paste #\d+ (?:attached|excerpt)(?:[^\n]*?)\]/.test(text)

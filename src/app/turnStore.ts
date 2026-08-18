@@ -1,0 +1,100 @@
+import { atom } from 'nanostores'
+import { useSyncExternalStore } from 'react'
+
+import { isTodoDone } from '../lib/liveProgress.js'
+import type { ActiveTool, ActivityItem, Msg, SubagentProgress, TodoItem } from '../types.js'
+
+const buildTurnState = (): TurnState => ({
+  activity: [],
+  lastDeltaAt: null,
+  streamedChars: 0,
+  outcome: '',
+  reasoning: '',
+  reasoningActive: false,
+  reasoningStreaming: false,
+  reasoningTokens: 0,
+  streamPendingTools: [],
+  streamSegments: [],
+  streaming: '',
+  subagents: [],
+  todoCollapsed: false,
+  todos: [],
+  toolTokens: 0,
+  tools: [],
+  turnTrail: []
+})
+
+export const $turnState = atom<TurnState>(buildTurnState())
+
+export const getTurnState = () => $turnState.get()
+
+const subscribeTurn = (cb: () => void) => $turnState.listen(() => cb())
+
+export const useTurnSelector = <T>(selector: (state: TurnState) => T): T =>
+  useSyncExternalStore(
+    subscribeTurn,
+    () => selector($turnState.get()),
+    () => selector($turnState.get())
+  )
+
+export const patchTurnState = (next: Partial<TurnState> | ((state: TurnState) => TurnState)) =>
+  $turnState.set(typeof next === 'function' ? next($turnState.get()) : { ...$turnState.get(), ...next })
+
+export const toggleTodoCollapsed = () => patchTurnState(state => ({ ...state, todoCollapsed: !state.todoCollapsed }))
+
+export const archiveDoneTodos = () => archiveTodosAtTurnEnd()
+
+export const archiveTodosAtTurnEnd = () => {
+  const state = $turnState.get()
+
+  if (!state.todos.length) {
+    return []
+  }
+
+  // CC parity: an INCOMPLETE list is not archived — it stays live in the HUD
+  // across turns (the original's TaskListV2 renders from AppState.tasks in
+  // the idle REPL too, REPL.tsx:4934, until the work is finished). Archiving
+  // it here was the third reason the checklist "never seemed to be there":
+  // the moment a turn ended, the list left the pinned panel for a transcript
+  // block that scrolls away. startMessage()/reset() leave todos untouched,
+  // so the surviving list keeps updating on the next turn.
+  if (!isTodoDone(state.todos)) {
+    return []
+  }
+
+  const msg: Msg = {
+    kind: 'trail',
+    role: 'system',
+    text: '',
+    todos: state.todos,
+    todoCollapsedByDefault: true
+  }
+
+  patchTurnState({ todoCollapsed: false, todos: [] })
+
+  return [msg]
+}
+
+export const resetTurnState = () => $turnState.set(buildTurnState())
+
+export interface TurnState {
+  activity: ActivityItem[]
+  // Busy-line telemetry: total streamed response chars this turn (token
+  // estimate = chars/4) and the last delta timestamp (stall detection).
+  lastDeltaAt: null | number
+  streamedChars: number
+  outcome: string
+  reasoning: string
+  reasoningActive: boolean
+  reasoningStreaming: boolean
+  reasoningTokens: number
+  streamPendingTools: string[]
+  streamSegments: Msg[]
+  streaming: string
+  subagents: SubagentProgress[]
+  todoCollapsed: boolean
+  todos: TodoItem[]
+  toolTokens: number
+  tools: ActiveTool[]
+  turnTrail: string[]
+}
