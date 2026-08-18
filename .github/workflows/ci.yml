@@ -16,4 +16,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      - run: npm run verify:boundary
       - run: npm test
+      - name: e2e (real dsh boot in a PTY, scripted LLM)
+        run: npm run e2e

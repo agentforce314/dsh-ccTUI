@@ -27,6 +27,28 @@ sources. Everything not listed here is a verbatim copy.
 Revisit: when a stage touches one of these areas, reconcile the skipped expectation with the
 observed behavior instead of leaving it skipped.
 
-- Local flake: `src/__tests__/modelPicker.test.tsx` ("offers auto plus the levels the model
-  accepts") can fail under full-suite parallel load on slow machines (20ms stdin delays); it
-  passes consistently in isolation. Watch CI; bump the test's delay if it flakes there too.
+- Local flake class: the interactive `.tsx` suites (modelPicker, questionPromptMount, ...)
+  drive fake stdin with fixed 20ms delays and can fail under full-suite parallel load on slow
+  machines while passing consistently in isolation. Mitigated with `retry: 1` in
+  vitest.config.ts — a real regression still fails twice.
+
+## Stage 4 — harness gateway
+
+- `src/gatewayClient.ts`: single-token diff — `const SLASHES` became `export const SLASHES`
+  so the harness client can serve `commands.catalog`/`complete.slash` from the same table.
+- New `src/harness/` (the only directory allowed to import `@deepseek-ai/*`, gated by
+  `npm run verify:boundary`): `index.ts` (cordis plugin surface), `plugin.ts` (entry.tsx-
+  equivalent boot wiring), `client.ts` (`HarnessGatewayClient extends GatewayClient` —
+  overrides `start`/`request`/`kill`; start() creates an in-process harness agent instead of
+  spawning Python, and `session/event` records are translated onto the GatewayEvent union).
+- `dist/plugin.js` is an esbuild bundle with ONLY `@deepseek-ai/*` external: React, the ink
+  fork, and the app ship inside the plugin file, so a dsh profile needs no additional
+  node_modules and there is never a second React copy.
+- e2e (`npm run e2e`): boots the real `dsh` CLI from this repo's node_modules (one copy of
+  every harness package in the process), dsh-base bundle + a scripted mock LLM adapter
+  (`test/e2e/mock-llm.mjs`, provider route `mock`), inside a Python PTY driver that answers
+  DA1/CPR/OSC-11 terminal queries. Asserts banner+composer render, a streamed
+  `MOCK-REPLY: <prompt>` turn, and clean `/quit`.
+- The mock adapter must pick the last message with `source.kind === 'user'` — the harness
+  injects context (time, instructions) as user-role messages and a naive "last user message"
+  echoes those instead of the human prompt.

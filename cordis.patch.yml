@@ -1,0 +1,14 @@
+# Bundle layer applied when a dsh profile lists dsh-cc-tui in its bundles
+# (dsh plugin --profile <p> add dsh-cc-tui). Composes over @deepseek-ai/dsh-base.
+#
+# Kept deliberately small: the TUI mounts as one row and creates its own agent
+# at runtime; base-bundle tool/service rows stay untouched.
+
+# Hot reload watches source trees; pointless and noisy under a packaged TUI.
+- id: hmr
+  disabled: true
+
+- insert:
+    - id: cc-tui
+      name: dsh-cc-tui
+      config: {}
