@@ -1,7 +1,8 @@
 reference_projects/
 node_modules/
-dist/
-lib/
+/dist/
+/lib/
+packages/clawcodex-ink/dist/
 *.tsbuildinfo
 .dsh-dev-home/
 *.log
