@@ -136,5 +136,10 @@ Acceptance: docs merged to `main`.
   persisted selection, token-meter usage/context bar.
 - 2026-08-18: Stage 8 merged (#8) — presentation views (diff cards via structuredPatch,
   terminal/search views), todos rider, tool.generating, resume stats.
-- 2026-08-18: Stage 9 — packaging: install.sh + bin launcher, installed-path e2e via real
-  `dsh plugin add` (in CI), README; v0.1.0.
+- 2026-08-18: Stage 9 merged (#9) — packaging: install.sh + bin launcher, installed-path
+  e2e via real `dsh plugin add` (in CI), README.
+- 2026-08-18: **v0.1.0 tagged — all nine stages complete.** The clawcodex TUI runs as a
+  deepseek-harness plugin: conversation loop, tool trail + diff cards, approvals, questions,
+  plan review, permission modes, sessions/resume, command bridge, model picker, usage
+  metering, checkout-based install. Remaining ideas live in PORTING-NOTES (skipped upstream
+  test skew, features with no harness backend).
