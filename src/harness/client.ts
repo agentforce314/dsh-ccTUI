@@ -12,6 +12,10 @@ import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection, type Agent, type AgentHandle, type ModelSelection, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
 import { SessionId, type Session, type SessionEvent } from '@deepseek-ai/dsh-session'
 import { createUserMessage, type ContentBlock, type StreamChunk, type TokenUsage } from '@deepseek-ai/dsh-llm'
+import type { ApprovalOutcome, ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
+import type { AskUserQuestionAnswer, AskUserQuestionItem, AskUserQuestionRequest } from '@deepseek-ai/dsh-user-questions'
+// Type-only: activates the 'plan/mode' SessionEventMap augmentation.
+import type {} from '@deepseek-ai/dsh-plan-mode'
 
 import { GatewayClient, SLASHES } from '../gatewayClient.js'
 import type { SessionInfo, Usage } from '../types.js'
@@ -87,6 +91,13 @@ export class HarnessGatewayClient extends GatewayClient {
   private usageTotals: Usage = { calls: 0, input: 0, output: 0, total: 0 }
   private turnCount = 0
   private permissionMode = 'default'
+  private callArgs = new Map<string, string>()
+  private gateApproval: { resolve: (o: ApprovalOutcome) => void } | null = null
+  private gateQuestion: {
+    items: AskUserQuestionItem[]
+    planApprove?: string
+    resolve: (a: AskUserQuestionAnswer) => void
+  } | null = null
 
   constructor(ctx: Context, opts: HarnessClientOptions = {}) {
     super()
@@ -130,6 +141,7 @@ export class HarnessGatewayClient extends GatewayClient {
     this.agent = handle.agent
     this.sid = String(sessionId)
     this.bindAgent(handle.agent)
+    this.installGates(handle.agent)
     this.info = this.buildSessionInfo(route, cwd)
     this.harnessReadyResolve()
     this.publishLocalEvent({ session_id: this.sid, type: 'gateway.ready' })
@@ -245,6 +257,7 @@ export class HarnessGatewayClient extends GatewayClient {
 
         this.callNames.set(id, name)
         this.callStarted.set(id, Date.now())
+        this.callArgs.set(id, prettyArgs(rawArgs))
         this.publishLocalEvent({
           payload: { args_text: prettyArgs(rawArgs), name, tool_id: id },
           session_id: this.sid,
@@ -277,6 +290,18 @@ export class HarnessGatewayClient extends GatewayClient {
 
       case 'turn/end': {
         this.finishTurn()
+        break
+      }
+
+      case 'plan/mode': {
+        const active = Boolean((event as SessionEvent<'plan/mode'>).data.active)
+        const mode = active ? 'plan' : this.permissionMode === 'plan' ? 'default' : this.permissionMode
+
+        if (mode !== this.permissionMode) {
+          this.permissionMode = mode
+          this.publishLocalEvent({ payload: { mode }, session_id: this.sid, type: 'permission.mode' })
+        }
+
         break
       }
 
@@ -346,6 +371,118 @@ export class HarnessGatewayClient extends GatewayClient {
       type: 'message.complete'
     })
     this.msgStartedHarness = false
+  }
+
+
+  // ── interaction gates (approvals / questions / plan review) ────────────
+  private installGates(agent: Agent): void {
+    if (this.ctx.get('approval') !== undefined) {
+      this.disposers.push(
+        this.ctx.on('approval/request', (req: ApprovalRequest, next: () => Promise<ApprovalOutcome>) => {
+          if (req.agent !== agent) {
+            return next()
+          }
+
+          return this.parkApproval(req)
+        }) as () => void
+      )
+    }
+
+    const userQuestions = this.ctx.get('userQuestions') as
+      | { registerProvider: (p: { ask: (r: AskUserQuestionRequest) => Promise<AskUserQuestionAnswer> }) => () => void }
+      | undefined
+
+    if (userQuestions) {
+      try {
+        this.disposers.push(userQuestions.registerProvider({ ask: request => this.parkQuestion(request) }))
+      } catch {
+        // A composed profile may already carry a provider (DUPLICATE_PROVIDER);
+        // yield rather than crash the boot — the other surface answers.
+      }
+    }
+  }
+
+  private parkApproval(req: ApprovalRequest): Promise<ApprovalOutcome> {
+    const id = req.callId ? String(req.callId) : ''
+    const command = (id ? this.callArgs.get(id) : undefined) ?? req.reason ?? req.toolName
+
+    return new Promise<ApprovalOutcome>(resolve => {
+      this.gateApproval = { resolve }
+      req.signal?.addEventListener(
+        'abort',
+        () => {
+          if (this.gateApproval?.resolve === resolve) {
+            this.gateApproval = null
+            resolve('cancelled')
+          }
+        },
+        { once: true }
+      )
+      this.publishLocalEvent({
+        payload: {
+          allow_permanent: false,
+          command,
+          tool_name: req.toolName,
+          warning: req.reason ?? null
+        },
+        session_id: this.sid,
+        type: 'approval.request'
+      })
+    })
+  }
+
+  private parkQuestion(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer> {
+    const items = request.questions
+
+    return new Promise<AskUserQuestionAnswer>(resolve => {
+      const planItem = items.length === 1 && items[0]!.intent?.kind === 'plan-review' ? items[0]! : undefined
+
+      this.gateQuestion = { items: [...items], planApprove: planItem?.intent?.approve, resolve }
+
+      if (planItem) {
+        this.publishLocalEvent({
+          payload: { bypass_available: true, plan: planItem.detail ?? planItem.question, plan_file_path: null },
+          session_id: this.sid,
+          type: 'plan.approval'
+        })
+
+        return
+      }
+
+      this.publishLocalEvent({
+        payload: {
+          questions: items.map(q => ({
+            header: q.header,
+            multiSelect: q.multiSelect,
+            options: q.options?.map(o => ({ description: o.description, label: o.label })),
+            question: q.question
+          }))
+        },
+        session_id: this.sid,
+        type: 'question.request'
+      })
+    })
+  }
+
+  private applyPermissionMode(mode: string): void {
+    const agent = this.agent
+
+    if (!agent) {
+      return
+    }
+
+    const planMode = this.ctx.get('planMode') as { set?: (a: Agent, active: boolean) => unknown } | undefined
+    const approval = this.ctx.get('approval') as { setPolicy?: (a: Agent, policy: 'ask' | 'never') => void } | undefined
+
+    planMode?.set?.(agent, mode === 'plan')
+    approval?.setPolicy?.(agent, mode === 'bypassPermissions' ? 'never' : 'ask')
+    this.permissionMode = mode
+
+    if (this.info) {
+      this.info = { ...this.info, permission_mode: mode }
+    }
+
+    this.publishLocalEvent({ payload: { mode }, session_id: this.sid, type: 'permission.mode' })
   }
 
   // ── outbound ───────────────────────────────────────────────────────────
@@ -451,6 +588,98 @@ export class HarnessGatewayClient extends GatewayClient {
         }))
 
         return Promise.resolve({ items, replace_from: 1 } as T)
+      }
+
+      case 'approval.respond': {
+        const choice = String(p.choice ?? 'deny')
+        const pending = this.gateApproval
+
+        this.gateApproval = null
+        pending?.resolve(choice === 'deny' ? 'rejected' : 'allowed-once')
+
+        return Promise.resolve({ ok: true } as T)
+      }
+
+      case 'planApproval.respond': {
+        const choice = String(p.choice ?? 'deny')
+        const feedback = typeof p.feedback === 'string' && p.feedback.trim() ? p.feedback.trim() : undefined
+        const pending = this.gateQuestion
+
+        this.gateQuestion = null
+
+        if (pending?.planApprove !== undefined) {
+          const item = pending.items[0]!
+
+          if (choice === 'deny') {
+            pending.resolve({
+              answers: [{ custom: feedback ?? 'Keep planning — the user rejected this plan.', id: item.id, selected: [] }]
+            })
+          } else {
+            pending.resolve({ answers: [{ id: item.id, selected: [pending.planApprove] }] })
+
+            if (choice === 'bypass') {
+              this.applyPermissionMode('bypassPermissions')
+            } else if (choice === 'default' || choice === 'accept-edits') {
+              this.applyPermissionMode('default')
+            }
+          }
+        }
+
+        return Promise.resolve({ ok: true } as T)
+      }
+
+      case 'question.respond': {
+        const answers = (p.answers ?? null) as null | Record<string, string>
+        const pending = this.gateQuestion
+
+        this.gateQuestion = null
+
+        if (pending) {
+          if (!answers) {
+            pending.resolve({ answers: pending.items.map(q => ({ id: q.id, selected: [] })) })
+          } else {
+            pending.resolve({
+              answers: pending.items.map(q => {
+                const raw = answers[q.question]
+
+                if (typeof raw !== 'string' || raw === '') {
+                  return { id: q.id, selected: [] }
+                }
+
+                const labels = new Set((q.options ?? []).map(o => o.label))
+                const parts = q.multiSelect ? raw.split(', ') : [raw]
+                const selected = parts.filter(part => labels.has(part))
+                const custom = parts.filter(part => !labels.has(part)).join(', ')
+
+                return { custom: custom || undefined, id: q.id, selected }
+              })
+            })
+          }
+        }
+
+        return Promise.resolve({ ok: true } as T)
+      }
+
+      case 'permission.cycle': {
+        const order = ['default', 'plan', 'bypassPermissions']
+        const next = order[(order.indexOf(this.permissionMode) + 1) % order.length]!
+
+        this.applyPermissionMode(next)
+
+        return Promise.resolve({ mode: next } as T)
+      }
+
+      case 'config.set': {
+        if (String(p.key ?? '') === 'permission_mode') {
+          const value = String(p.value ?? 'default')
+          const mode = value === 'acceptEdits' ? 'default' : value
+
+          this.applyPermissionMode(mode)
+
+          return Promise.resolve({ mode, ok: true, persisted: false } as T)
+        }
+
+        return Promise.resolve({} as T)
       }
 
       // Local filesystem completion is backend-free in the parent class.

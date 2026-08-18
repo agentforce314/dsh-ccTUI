@@ -126,5 +126,7 @@ Acceptance: docs merged to `main`.
 
 - 2026-08-18: Stage 1 merged (#1). Stage 2 merged (#2) — fork vendored, 129 fork tests green.
 - 2026-08-18: Stage 3 merged (#3) — verbatim app copy, 1879 tests green, AppLayout mounts headless.
-- 2026-08-18: Stage 4 — harness gateway: real dsh boots the TUI as a cordis plugin; scripted
-  end-to-end turn (prompt → stream → complete) passes in a PTY e2e.
+- 2026-08-18: Stage 4 merged (#4) — harness gateway: real dsh boots the TUI as a cordis
+  plugin; scripted end-to-end turn passes in a PTY e2e (also in CI).
+- 2026-08-18: Stage 5 — gates: approvals (sandbox escalation e2e round-trip), user questions,
+  plan review, permission-mode cycle.

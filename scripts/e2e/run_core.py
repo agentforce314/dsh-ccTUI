@@ -188,7 +188,23 @@ def run() -> int:
             elif "harness agent failed" in flatten(bytes(transcript)):
                 failures.append("agent failed to start")
             drain(1.5)
-            # 4. Quit via /quit.
+            # 4. Approval flow: trigger a bash tool call, approve it, watch it run.
+            os.write(master, b"please USE-BASH now")
+            drain(0.5)
+            os.write(master, b"\r")
+            gate = read_until(["Yes", "harness agent failed"], 45)
+            if gate is None:
+                failures.append("approval prompt never appeared")
+            elif gate == "Yes":
+                drain(0.5)
+                os.write(master, b"1")  # approve once
+                if not read_until(["TOOL-STEP-DONE"], 45):
+                    failures.append("bash tool turn never completed after approval")
+                if "e2e-bash-ok" not in flatten(bytes(transcript)):
+                    # the tool trail shows the command result line
+                    read_until(["e2e-bash-ok"], 10)
+            drain(1.5)
+            # 5. Quit via /quit.
             os.write(master, b"/quit")
             drain(0.5)
             os.write(master, b"\r")
@@ -221,6 +237,8 @@ def run() -> int:
         ("banner/composer rendered", PROMPT_GLYPH in text),
         ("mock reply streamed", "MOCK-REPLY: hello harness" in flat),
         ("no unhandled errors", "Unhandled" not in flat and "harness agent failed" not in flat),
+        ("approval prompt shown", "Yes" in flat and "bash" in flat),
+        ("approved tool ran to completion", "TOOL-STEP-DONE" in flat),
     ]
     for label, ok in checks:
         print(f"  {'PASS' if ok else 'FAIL'}  {label}")

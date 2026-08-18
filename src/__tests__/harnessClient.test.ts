@@ -23,6 +23,9 @@ function makeWorld() {
     status: 'idle'
   }
   const handle = { agent, dispose: vi.fn(async () => {}) }
+  const policies: Array<[unknown, string]> = []
+  const planSets: Array<[unknown, boolean]> = []
+  const providers: Array<{ ask: (r: unknown) => Promise<unknown> }> = []
   const ctx = {
     agents: {
       create: vi.fn(async () => handle)
@@ -30,6 +33,18 @@ function makeWorld() {
     get: (name: string) => {
       if (name === 'tools') {
         return { schemas: () => [{ name: 'bash' }, { name: 'read' }] }
+      }
+
+      if (name === 'approval') {
+        return { setPolicy: (a: unknown, policy: string) => policies.push([a, policy]) }
+      }
+
+      if (name === 'planMode') {
+        return { set: (a: unknown, active: boolean) => planSets.push([a, active]) }
+      }
+
+      if (name === 'userQuestions') {
+        return { registerProvider: (prov: { ask: (r: unknown) => Promise<unknown> }) => { providers.push(prov); return () => {} } }
       }
 
       return undefined
@@ -55,7 +70,7 @@ function makeWorld() {
     }
   }
 
-  return { agent, cancels, client, ctx, events, fire, followups, steers }
+  return { agent, cancels, client, ctx, events, fire, followups, listeners, planSets, policies, providers, steers }
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0))
@@ -191,5 +206,139 @@ describe('HarnessGatewayClient', () => {
     w.client.start()
     await settle()
     await expect(w.client.request('billing.state', {})).resolves.toEqual({})
+  })
+
+  it('parks approval/request for its own agent and settles from approval.respond', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.fire('turn/start', { turn: 1 })
+    w.fire('tool/call', { arguments: '{"command":"rm -rf x"}', callId: 'c1', name: 'bash', step: 1, turn: 1 })
+
+    const handler = (w.listeners.get('approval/request') ?? [])[0]!
+    const outcome = handler({ agent: w.agent, callId: 'c1', toolName: 'bash' }, () => Promise.resolve('unavailable')) as Promise<string>
+
+    await settle()
+
+    const ask = w.events.at(-1) as Extract<GatewayEvent, { type: 'approval.request' }>
+
+    expect(ask.type).toBe('approval.request')
+    expect(ask.payload).toMatchObject({ allow_permanent: false, command: 'rm -rf x', tool_name: 'bash' })
+
+    await w.client.request('approval.respond', { choice: 'once' })
+    await expect(outcome).resolves.toBe('allowed-once')
+
+    // deny path
+    const denied = handler({ agent: w.agent, callId: 'c1', toolName: 'bash' }, () => Promise.resolve('unavailable')) as Promise<string>
+
+    await w.client.request('approval.respond', { choice: 'deny' })
+    await expect(denied).resolves.toBe('rejected')
+  })
+
+  it('delegates approvals for other agents down the chain', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+
+    const handler = (w.listeners.get('approval/request') ?? [])[0]!
+    const outcome = await (handler({ agent: { other: true }, toolName: 'bash' }, () => Promise.resolve('unavailable')) as Promise<string>)
+
+    expect(outcome).toBe('unavailable')
+    expect(w.events.some(e => e.type === 'approval.request')).toBe(false)
+  })
+
+  it('serves user questions and maps answers back by question text', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+
+    const provider = w.providers[0]!
+    const answer = provider.ask({
+      questions: [
+        { id: 'q1', multiSelect: false, options: [{ label: 'Red' }, { label: 'Blue' }], question: 'Pick a color' },
+        { id: 'q2', multiSelect: true, options: [{ label: 'A' }, { label: 'B' }], question: 'Pick letters' }
+      ]
+    }) as Promise<{ answers: Array<{ custom?: string; id: string; selected: string[] }> }>
+
+    await settle()
+
+    const ask = w.events.at(-1) as Extract<GatewayEvent, { type: 'question.request' }>
+
+    expect(ask.type).toBe('question.request')
+    expect(ask.payload.questions).toHaveLength(2)
+
+    await w.client.request('question.respond', {
+      answers: { 'Pick a color': 'typed something', 'Pick letters': 'A, B, extra note' }
+    })
+
+    const got = await answer
+
+    expect(got.answers).toEqual([
+      { custom: 'typed something', id: 'q1', selected: [] },
+      { custom: 'extra note', id: 'q2', selected: ['A', 'B'] }
+    ])
+  })
+
+  it('maps plan-review intents onto plan.approval and honors approve/deny', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+
+    const provider = w.providers[0]!
+    const approve = provider.ask({
+      questions: [{ detail: 'THE PLAN', id: 'p1', intent: { approve: 'Approve plan', kind: 'plan-review' }, options: [{ label: 'Approve plan' }, { label: 'Keep planning' }], question: 'Review' }]
+    }) as Promise<{ answers: Array<{ id: string; selected: string[] }> }>
+
+    await settle()
+
+    const ask = w.events.at(-1) as Extract<GatewayEvent, { type: 'plan.approval' }>
+
+    expect(ask.type).toBe('plan.approval')
+    expect(ask.payload.plan).toBe('THE PLAN')
+
+    await w.client.request('planApproval.respond', { choice: 'default' })
+
+    const got = await approve
+
+    expect(got.answers[0]).toEqual({ id: 'p1', selected: ['Approve plan'] })
+
+    // deny with feedback
+    const deny = provider.ask({
+      questions: [{ detail: 'P2', id: 'p2', intent: { approve: 'Approve plan', kind: 'plan-review' }, question: 'Review' }]
+    }) as Promise<{ answers: Array<{ custom?: string; id: string; selected: string[] }> }>
+
+    await settle()
+    await w.client.request('planApproval.respond', { choice: 'deny', feedback: 'tighten scope' })
+
+    const rejected = await deny
+
+    expect(rejected.answers[0]).toEqual({ custom: 'tighten scope', id: 'p2', selected: [] })
+  })
+
+  it('permission.cycle walks default → plan → bypassPermissions and drives services', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    await expect(w.client.request('permission.cycle', {})).resolves.toEqual({ mode: 'plan' })
+    expect(w.planSets.at(-1)).toEqual([w.agent, true])
+
+    await expect(w.client.request('permission.cycle', {})).resolves.toEqual({ mode: 'bypassPermissions' })
+    expect(w.planSets.at(-1)).toEqual([w.agent, false])
+    expect(w.policies.at(-1)).toEqual([w.agent, 'never'])
+
+    await expect(w.client.request('permission.cycle', {})).resolves.toEqual({ mode: 'default' })
+    expect(w.policies.at(-1)).toEqual([w.agent, 'ask'])
+    expect(w.events.filter(e => e.type === 'permission.mode').map(e => (e as { payload: { mode: string } }).payload.mode)).toEqual([
+      'plan',
+      'bypassPermissions',
+      'default'
+    ])
   })
 })
