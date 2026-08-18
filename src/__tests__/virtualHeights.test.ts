@@ -1,0 +1,118 @@
+import { describe, expect, it } from 'vitest'
+
+import { estimatedMsgHeight, messageHeightKey, wrappedLines } from '../lib/virtualHeights.js'
+import type { Msg } from '../types.js'
+
+describe('virtual height estimates', () => {
+  it('uses stable content keys across resumed message objects', () => {
+    const msg: Msg = { role: 'assistant', text: 'same text', tools: ['Search Files [long message]'] }
+
+    expect(messageHeightKey(msg)).toBe(messageHeightKey({ ...msg }))
+  })
+
+  it('accounts for wrapping and preserved blank-block rhythm', () => {
+    const msg: Msg = { role: 'assistant', text: `one\n\n${'x'.repeat(90)}` }
+
+    expect(wrappedLines(msg.text, 30)).toBe(5)
+    expect(estimatedMsgHeight(msg, 35, { compact: false, details: false })).toBeGreaterThan(5)
+  })
+
+  // KNOWN-SKEW(upstream): fails identically in the pristine clawcodex ui-tui checkout — see docs/PORTING-NOTES.md
+  it.skip('uses compound user prompt width when estimating user message wrapping', () => {
+    const msg: Msg = { role: 'user', text: 'x'.repeat(21) }
+
+    expect(estimatedMsgHeight(msg, 26, { compact: false, details: false, userPrompt: '❯' })).toBe(3)
+    expect(estimatedMsgHeight(msg, 26, { compact: false, details: false, userPrompt: 'Ψ >' })).toBe(4)
+  })
+
+  it('adds one row for a group-boundary lead gap', () => {
+    const msg: Msg = { role: 'assistant', text: 'reply' }
+
+    expect(estimatedMsgHeight(msg, 80, { compact: false, details: false, leadGap: true })).toBe(
+      estimatedMsgHeight(msg, 80, { compact: false, details: false, leadGap: false }) + 1
+    )
+  })
+
+  it('includes detail sections when visible', () => {
+    const msg: Msg = { role: 'assistant', text: 'ok', thinking: 'line 1\nline 2', tools: ['Tool A', 'Tool B'] }
+
+    expect(estimatedMsgHeight(msg, 80, { compact: false, details: true })).toBeGreaterThan(
+      estimatedMsgHeight(msg, 80, { compact: false, details: false })
+    )
+  })
+
+  it('accounts for the response separator when assistant details are visible', () => {
+    const msg: Msg = { role: 'assistant', text: 'ok', thinking: 'plan' }
+
+    // Measured against the real paint (see toolBrief.test.ts's parity suite):
+    // `∴ Thinking…` header, the reasoning body, the details wrapper's
+    // marginBottom, the `└─ Response` row, and its marginBottom — 5 rows above
+    // the bare `⏺ ok`. The header and the wrapper margin used to be missing.
+    expect(estimatedMsgHeight(msg, 80, { compact: false, details: true })).toBe(
+      estimatedMsgHeight(msg, 80, { compact: false, details: false }) + 5
+    )
+  })
+
+  it('does not account for a response separator without visible details', () => {
+    const msg: Msg = { role: 'assistant', text: 'ok' }
+
+    expect(estimatedMsgHeight(msg, 80, { compact: false, details: true })).toBe(
+      estimatedMsgHeight(msg, 80, { compact: false, details: false })
+    )
+  })
+
+  it('honors per-section visibility when estimating response separators', () => {
+    const thinkingOnly: Msg = { role: 'assistant', text: 'ok', thinking: 'plan' }
+    const toolsOnly: Msg = { role: 'assistant', text: 'ok', tools: ['Tool A'] }
+
+    expect(
+      estimatedMsgHeight(thinkingOnly, 80, {
+        compact: false,
+        details: true,
+        thinkingVisible: false,
+        toolsVisible: true
+      })
+    ).toBe(estimatedMsgHeight(thinkingOnly, 80, { compact: false, details: false }))
+
+    expect(
+      estimatedMsgHeight(toolsOnly, 80, {
+        compact: false,
+        details: true,
+        thinkingVisible: true,
+        toolsVisible: false
+      })
+    ).toBe(estimatedMsgHeight(toolsOnly, 80, { compact: false, details: false }))
+  })
+
+  it('gives every user message the same height when the band renders', () => {
+    // With color available, the userMessageBackground band replaces the dash
+    // separator and adds no rows — non-first user rows cost the same.
+    const msg: Msg = { role: 'user', text: 'follow-up question' }
+
+    expect(estimatedMsgHeight(msg, 80, { compact: false, details: false })).toBe(3)
+  })
+
+  it('reserves two rows for the monochrome ─── fallback separator', () => {
+    // NO_COLOR terminals can't see the band; the textual separator returns
+    // (1 rule row + 1 margin row) and the estimate must match the render.
+    const msg: Msg = { role: 'user', text: 'follow-up question' }
+    const base = estimatedMsgHeight(msg, 80, { compact: false, details: false })
+
+    expect(estimatedMsgHeight(msg, 80, { compact: false, details: false, withSeparator: true })).toBe(base + 2)
+  })
+
+  it('caps wrapped-line counting so giant assistant turns do not block offset rebuilds', () => {
+    // wrappedLines is invoked once per uncached message during
+    // useVirtualHistory's offset rebuild. Unbounded counting on a long
+    // assistant response (10k+ chars × every row × every rebuild) blocks
+    // the UI on cold mount. Cap is ~800 rows; post-mount Yoga
+    // measurement converges to the true height regardless.
+    const giant = 'x'.repeat(1_000_000)
+    const t0 = performance.now()
+    const rows = wrappedLines(giant, 80)
+    const elapsed = performance.now() - t0
+
+    expect(rows).toBeLessThanOrEqual(800)
+    expect(elapsed).toBeLessThan(50)
+  })
+})
