@@ -771,7 +771,7 @@ export function formatToolResult(
  *  TUI-local command (/model, /compact, /bg, /resume, /clear, /exit — the
  *  local registry dispatches first) deliberately carry NO hint here: the
  *  local command's argumentHint is the one that matches actual behavior. */
-const SLASHES: ReadonlyArray<{ desc: string; hint?: string; name: string }> = [
+export const SLASHES: ReadonlyArray<{ desc: string; hint?: string; name: string }> = [
   { desc: 'Show available commands', name: '/help' },
   { desc: 'Clear the conversation', name: '/clear' },
   { desc: 'Switch the model', name: '/model' },
