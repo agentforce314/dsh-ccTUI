@@ -73,3 +73,18 @@ observed behavior instead of leaving it skipped.
   omitted — no harness analog). plan drives ctx.planMode.set, bypass drives
   ctx.approval.setPolicy('never'); 'plan/mode' session events (e.g. the model exiting plan
   mode) flow back as permission.mode updates.
+
+## Stage 6 — sessions
+
+- The client keeps a live-agent registry (Map<sid, AgentHandle>); the UI binds to one
+  (attach() = swap subscriptions + rebuild info + recount the turn odometer from the log).
+  session.close disposes; kill() disposes all.
+- session.resume/activate: live handles switch in place; persisted ids go through
+  ctx.agents.resume, then the transcript is rehydrated from agent.session.events
+  (user/message with source.kind user → user rows; assistant/message → assistant rows;
+  tool/call → tool trail rows with prettyArgs context).
+- session.list serves sessionPersistence.list() newest-first with titles from
+  sessionProjectionCache.cachedSnapshot when warm; session.active_list reflects the live
+  map with agent.status. session.title get/rename via ctx.sessionTitle.
+- e2e is now two-phase: phase 2 boots fresh and `/sessions <fixed-id>` replays phase 1's
+  persisted conversation.

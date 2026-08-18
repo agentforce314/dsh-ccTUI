@@ -10,7 +10,7 @@ import { randomUUID } from 'node:crypto'
 
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection, type Agent, type AgentHandle, type ModelSelection, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
-import { SessionId, type Session, type SessionEvent } from '@deepseek-ai/dsh-session'
+import { SessionId, type Session, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import { createUserMessage, type ContentBlock, type StreamChunk, type TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { ApprovalOutcome, ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
 import type { AskUserQuestionAnswer, AskUserQuestionItem, AskUserQuestionRequest } from '@deepseek-ai/dsh-user-questions'
@@ -18,6 +18,7 @@ import type { AskUserQuestionAnswer, AskUserQuestionItem, AskUserQuestionRequest
 import type {} from '@deepseek-ai/dsh-plan-mode'
 
 import { GatewayClient, SLASHES } from '../gatewayClient.js'
+import type { GatewayTranscriptMessage } from '../gatewayTypes.js'
 import type { SessionInfo, Usage } from '../types.js'
 
 export interface HarnessClientOptions {
@@ -71,7 +72,9 @@ export class HarnessGatewayClient extends GatewayClient {
 
   private agent: Agent | null = null
   private handle: AgentHandle | null = null
+  private live = new Map<string, AgentHandle>()
   private disposers: Array<() => void> = []
+  private agentDisposers: Array<() => void> = []
   private selection: ModelSelectionRef = { current: undefined, assembled: undefined }
 
   private harnessReady: Promise<void>
@@ -80,6 +83,7 @@ export class HarnessGatewayClient extends GatewayClient {
 
   private sid = ''
   private info: SessionInfo | null = null
+  private sessionCreateConsumed = false
 
   // per-turn accumulation
   private turnStarted = false
@@ -122,30 +126,132 @@ export class HarnessGatewayClient extends GatewayClient {
 
     await loader?.await?.()
 
+    const handle = await this.createAgent(this.opts.sessionId)
+
+    this.attach(handle)
+    this.installGates()
+    this.harnessReadyResolve()
+    this.publishLocalEvent({ session_id: this.sid, type: 'gateway.ready' })
+
+    if (this.info) {
+      this.publishLocalEvent({ payload: this.info, session_id: this.sid, type: 'session.info' })
+    }
+  }
+
+  private workingDir(): string {
+    return this.opts.cwd ?? process.env.CLAWCODEX_WORKSPACE ?? process.env.CLAWCODEX_CWD ?? process.cwd()
+  }
+
+  private async createAgent(fixedSessionId?: string): Promise<AgentHandle> {
     const route = this.resolveRoute()
-    const cwd = this.opts.cwd ?? process.env.CLAWCODEX_WORKSPACE ?? process.env.CLAWCODEX_CWD ?? process.cwd()
-    const sessionId = SessionId(this.opts.sessionId ?? `cc-tui-${randomUUID()}`)
+    const sessionId = SessionId(fixedSessionId ?? `cc-tui-${randomUUID()}`)
 
     this.selection = { assembled: undefined, current: route }
 
     const handle = await this.ctx.agents.create({
       agentOptions: route ? { model: route.model, provider: route.provider } : {},
-      meta: { cwd },
+      meta: { cwd: this.workingDir() },
       sessionId,
       setup: agentCtx => {
         installModelSelection(agentCtx, this.selection)
       }
     })
 
+    this.live.set(String(sessionId), handle)
+
+    return handle
+  }
+
+  private async resumeAgent(sessionId: string): Promise<AgentHandle> {
+    const route = this.resolveRoute()
+
+    this.selection = { assembled: undefined, current: route }
+
+    const handle = await this.ctx.agents.resume({
+      agentOptions: route ? { model: route.model, provider: route.provider } : {},
+      resumeSessionId: SessionId(sessionId),
+      setup: agentCtx => {
+        installModelSelection(agentCtx, this.selection)
+      }
+    })
+
+    this.live.set(sessionId, handle)
+
+    return handle
+  }
+
+  /** Bind the UI to one live agent: event subscriptions, info, turn odometer. */
+  private attach(handle: AgentHandle): void {
+    for (const dispose of this.agentDisposers.splice(0)) {
+      try {
+        dispose()
+      } catch {
+        // best effort
+      }
+    }
+
     this.handle = handle
     this.agent = handle.agent
-    this.sid = String(sessionId)
+    this.sid = String(handle.agent.id)
     this.bindAgent(handle.agent)
-    this.installGates(handle.agent)
-    this.info = this.buildSessionInfo(route, cwd)
-    this.harnessReadyResolve()
-    this.publishLocalEvent({ session_id: this.sid, type: 'gateway.ready' })
-    this.publishLocalEvent({ payload: this.info, session_id: this.sid, type: 'session.info' })
+
+    const events = handle.agent.session.events
+
+    this.turnCount = events.filter(e => e.type === 'turn/end').length
+    this.turnStarted = false
+    this.turnText = []
+    this.turnReasoning = []
+    this.msgStartedHarness = false
+    this.usageTotals = { calls: 0, input: 0, output: 0, total: 0 }
+    this.info = this.buildSessionInfo(this.selection.current, handle.agent.session.header.cwd ?? this.workingDir())
+  }
+
+  /** Fold a session event log into resume-transcript rows. */
+  private rehydrate(events: readonly SessionEvent[]): GatewayTranscriptMessage[] {
+    const rows: GatewayTranscriptMessage[] = []
+
+    for (const event of events) {
+      switch (event.type) {
+        case 'user/message': {
+          const message = (event as SessionEvent<'user/message'>).data
+
+          if (message.source.kind !== 'user') {
+            break
+          }
+
+          const text = textOf(message.content, ['text'])
+
+          if (text) {
+            rows.push({ role: 'user', text })
+          }
+
+          break
+        }
+
+        case 'assistant/message': {
+          const { message } = (event as SessionEvent<'assistant/message'>).data
+          const text = textOf(message.content, ['text'])
+
+          if (text) {
+            rows.push({ role: 'assistant', text })
+          }
+
+          break
+        }
+
+        case 'tool/call': {
+          const { name, arguments: rawArgs } = (event as SessionEvent<'tool/call'>).data
+
+          rows.push({ context: prettyArgs(rawArgs), name, role: 'tool' })
+          break
+        }
+
+        default:
+          break
+      }
+    }
+
+    return rows
   }
 
   private resolveRoute(): ModelRoute | undefined {
@@ -188,7 +294,7 @@ export class HarnessGatewayClient extends GatewayClient {
   }
 
   private bindAgent(agent: Agent): void {
-    this.disposers.push(
+    this.agentDisposers.push(
       this.ctx.on('session/event', (session: Session, event: SessionEvent) => {
         if (session !== agent.session) {
           return
@@ -197,7 +303,7 @@ export class HarnessGatewayClient extends GatewayClient {
         this.onSessionEvent(event)
       }) as () => void
     )
-    this.disposers.push(
+    this.agentDisposers.push(
       this.ctx.on('agent/status', ({ agent: subject, status }: { agent: Agent; status: 'idle' | 'running' }) => {
         if (subject !== agent) {
           return
@@ -375,11 +481,11 @@ export class HarnessGatewayClient extends GatewayClient {
 
 
   // ── interaction gates (approvals / questions / plan review) ────────────
-  private installGates(agent: Agent): void {
+  private installGates(): void {
     if (this.ctx.get('approval') !== undefined) {
       this.disposers.push(
         this.ctx.on('approval/request', (req: ApprovalRequest, next: () => Promise<ApprovalOutcome>) => {
-          if (req.agent !== agent) {
+          if (req.agent !== this.agent) {
             return next()
           }
 
@@ -505,7 +611,7 @@ export class HarnessGatewayClient extends GatewayClient {
   }
 
   override kill(_reason = 'requested'): void {
-    for (const dispose of this.disposers.splice(0)) {
+    for (const dispose of [...this.agentDisposers.splice(0), ...this.disposers.splice(0)]) {
       try {
         dispose()
       } catch {
@@ -513,13 +619,50 @@ export class HarnessGatewayClient extends GatewayClient {
       }
     }
 
-    const handle = this.handle
-
     this.handle = null
     this.agent = null
 
-    if (handle) {
+    for (const handle of this.live.values()) {
       void handle.dispose().catch(() => {})
+    }
+
+    this.live.clear()
+  }
+
+
+  private async listPersisted(): Promise<SessionHeader[]> {
+    const persistence = this.ctx.get('sessionPersistence') as
+      | { list?: (signal?: AbortSignal) => Promise<SessionHeader[]> }
+      | undefined
+
+    try {
+      const headers = (await persistence?.list?.()) ?? []
+
+      return [...headers].sort((a, b) => b.createdAt - a.createdAt)
+    } catch {
+      return []
+    }
+  }
+
+  private cachedTitle(header: SessionHeader): string | undefined {
+    const cache = this.ctx.get('sessionProjectionCache') as
+      | { cachedSnapshot?: (meta: SessionHeader) => { values?: { title?: { title?: string } } } | undefined }
+      | undefined
+
+    try {
+      return cache?.cachedSnapshot?.(header)?.values?.title?.title
+    } catch {
+      return undefined
+    }
+  }
+
+  private titleOf(session: Session): string | undefined {
+    const titles = this.ctx.get('sessionTitle') as { get?: (s: Session) => { title: string } | undefined } | undefined
+
+    try {
+      return titles?.get?.(session)?.title
+    } catch {
+      return undefined
     }
   }
 
@@ -532,13 +675,118 @@ export class HarnessGatewayClient extends GatewayClient {
         return Promise.resolve({ provider_configured: true } as T)
 
       case 'session.create':
-        return this.harnessReady.then(() => {
-          if (this.startFailed || !this.agent) {
-            throw new Error(this.startFailed ?? 'agent unavailable')
+        return this.harnessReady.then(async () => {
+          if (this.startFailed) {
+            throw new Error(this.startFailed)
           }
+
+          // Boot uses the agent created by start(); later calls (/new, /clear)
+          // spin up a fresh session and switch the binding to it.
+          if (this.agent && !this.sessionCreateConsumed) {
+            this.sessionCreateConsumed = true
+
+            return { info: this.info ?? undefined, session_id: this.sid } as T
+          }
+
+          const handle = await this.createAgent()
+
+          this.attach(handle)
+          this.sessionCreateConsumed = true
 
           return { info: this.info ?? undefined, session_id: this.sid } as T
         })
+
+      case 'session.close': {
+        const id = String(p.session_id ?? '')
+        const handle = this.live.get(id)
+
+        if (handle) {
+          this.live.delete(id)
+
+          if (this.handle === handle) {
+            for (const dispose of this.agentDisposers.splice(0)) {
+              try {
+                dispose()
+              } catch {
+                // best effort
+              }
+            }
+
+            this.handle = null
+            this.agent = null
+          }
+
+          void handle.dispose().catch(() => {})
+        }
+
+        return Promise.resolve({ ok: true } as T)
+      }
+
+      case 'session.resume':
+      case 'session.activate': {
+        const id = String(p.session_id ?? '')
+
+        return (async () => {
+          let handle = this.live.get(id)
+
+          if (!handle) {
+            handle = await this.resumeAgent(id)
+          }
+
+          this.attach(handle)
+
+          const messages = this.rehydrate(handle.agent.session.events)
+          const running = handle.agent.status === 'running'
+
+          this.publishLocalEvent({ payload: this.info!, session_id: this.sid, type: 'session.info' })
+
+          return {
+            info: this.info ?? undefined,
+            message_count: messages.length,
+            messages,
+            running,
+            session_id: id,
+            started_at: handle.agent.session.header.createdAt,
+            status: running ? 'working' : 'idle'
+          } as T
+        })()
+      }
+
+      case 'session.most_recent': {
+        return this.listPersisted().then(headers => {
+          const latest = headers[0]
+
+          return (latest ? { session_id: String(latest.id) } : {}) as T
+        })
+      }
+
+      case 'session.title': {
+        const agent = this.agent
+        const titles = this.ctx.get('sessionTitle') as
+          | {
+              get?: (s: unknown) => { title: string } | undefined
+              rename?: (s: unknown, t: string) => { title: string }
+            }
+          | undefined
+
+        if (!agent || !titles) {
+          return Promise.resolve({} as T)
+        }
+
+        const requested = typeof p.title === 'string' ? p.title.trim() : ''
+
+        try {
+          if (requested) {
+            const snap = titles.rename?.(agent.session, requested)
+
+            return Promise.resolve({ title: snap?.title ?? requested } as T)
+          }
+
+          return Promise.resolve({ title: titles.get?.(agent.session)?.title } as T)
+        } catch (err) {
+          return Promise.reject(err instanceof Error ? err : new Error(String(err)))
+        }
+      }
 
       case 'prompt.submit': {
         this.deliver(String(p.text ?? ''), 'followup')
@@ -558,9 +806,34 @@ export class HarnessGatewayClient extends GatewayClient {
         return Promise.resolve({ ok: true } as T)
       }
 
-      case 'session.active_list':
+      case 'session.active_list': {
+        const sessions = [...this.live.entries()].map(([id, handle]) => ({
+          current: id === this.sid,
+          id,
+          last_active: undefined,
+          message_count: handle.agent.session.events.filter(e => e.type === 'user/message').length,
+          model: this.selection.current?.model,
+          started_at: handle.agent.session.header.createdAt,
+          status: handle.agent.status === 'running' ? 'working' : 'idle',
+          title: this.titleOf(handle.agent.session)
+        }))
+
+        return Promise.resolve({ sessions } as T)
+      }
+
       case 'session.list':
-        return Promise.resolve({ sessions: [] } as T)
+        return this.listPersisted().then(headers => {
+          const sessions = headers.slice(0, 50).map(header => ({
+            id: String(header.id),
+            message_count: 0,
+            preview: this.cachedTitle(header) ?? '',
+            source: 'harness',
+            started_at: header.createdAt,
+            title: this.cachedTitle(header) ?? String(header.id)
+          }))
+
+          return { sessions } as T
+        })
 
       case 'commands.catalog': {
         const pairs = SLASHES.map(s => [s.name, s.desc] as [string, string])

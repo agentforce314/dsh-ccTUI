@@ -7,7 +7,7 @@ import { HarnessGatewayClient } from '../harness/client.js'
 
 type Listener = (...args: unknown[]) => void
 
-const SESSION = { marker: 'session' }
+const SESSION = { events: [] as unknown[], header: { createdAt: 100, cwd: '/tmp/w', id: 'cc-test-session', version: 1 }, marker: 'session' }
 
 function makeWorld() {
   const listeners = new Map<string, Listener[]>()
@@ -23,12 +23,28 @@ function makeWorld() {
     status: 'idle'
   }
   const handle = { agent, dispose: vi.fn(async () => {}) }
+  const storedEvents = [
+    { data: { content: [{ text: 'old prompt', type: 'text' }], id: 'u1', role: 'user', source: { kind: 'user' } }, seq: 1, time: 1, type: 'user/message' },
+    { data: { arguments: '{"command":"ls"}', callId: 'c1', name: 'bash', step: 1, turn: 1 }, seq: 2, time: 2, type: 'tool/call' },
+    { data: { message: { content: [{ text: 'old reply', type: 'text' }], id: 'a1', role: 'assistant', source: { kind: 'model' } }, step: 1, turn: 1 }, seq: 3, time: 3, type: 'assistant/message' },
+    { data: { reason: { kind: 'completed' }, turn: 1 }, seq: 4, time: 4, type: 'turn/end' }
+  ]
+  const resumedAgent = {
+    cancel: vi.fn(),
+    followup: vi.fn(),
+    id: 'cc-resumed-1',
+    session: { events: storedEvents, header: { createdAt: 111, cwd: '/tmp/w', id: 'cc-resumed-1', version: 1 }, marker: 'resumed' },
+    status: 'idle',
+    steer: vi.fn()
+  }
+  const resumedHandle = { agent: resumedAgent, dispose: vi.fn(async () => {}) }
   const policies: Array<[unknown, string]> = []
   const planSets: Array<[unknown, boolean]> = []
   const providers: Array<{ ask: (r: unknown) => Promise<unknown> }> = []
   const ctx = {
     agents: {
-      create: vi.fn(async () => handle)
+      create: vi.fn(async () => handle),
+      resume: vi.fn(async () => resumedHandle)
     },
     get: (name: string) => {
       if (name === 'tools') {
@@ -45,6 +61,22 @@ function makeWorld() {
 
       if (name === 'userQuestions') {
         return { registerProvider: (prov: { ask: (r: unknown) => Promise<unknown> }) => { providers.push(prov); return () => {} } }
+      }
+
+      if (name === 'sessionPersistence') {
+        return {
+          list: async () => [
+            { createdAt: 50, id: 'cc-old-1', version: 1 },
+            { createdAt: 90, id: 'cc-old-2', version: 1 }
+          ]
+        }
+      }
+
+      if (name === 'sessionTitle') {
+        return {
+          get: () => ({ title: 'existing title' }),
+          rename: (_s: unknown, t: string) => ({ title: t })
+        }
       }
 
       return undefined
@@ -70,7 +102,7 @@ function makeWorld() {
     }
   }
 
-  return { agent, cancels, client, ctx, events, fire, followups, listeners, planSets, policies, providers, steers }
+  return { agent, cancels, client, ctx, events, fire, followups, listeners, planSets, policies, providers, resumedAgent, resumedHandle, steers }
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0))
@@ -196,8 +228,10 @@ describe('HarnessGatewayClient', () => {
     const res = await w.client.request<{ session_id: string }>('session.create', {})
     const createOpts = (w.ctx.agents.create as ReturnType<typeof vi.fn>).mock.calls[0]![0] as { sessionId: unknown }
 
-    expect(res.session_id).toBe(String(createOpts.sessionId))
-    expect(res.session_id).toMatch(/^cc-tui-/)
+    // The requested id is freshly generated; the binding then adopts the
+    // agent's own id (identical in a real harness, distinct in this fake).
+    expect(String(createOpts.sessionId)).toMatch(/^cc-tui-/)
+    expect(res.session_id).toBe(String(w.agent.id))
   })
 
   it('unmapped RPCs resolve to an empty object', async () => {
@@ -340,5 +374,78 @@ describe('HarnessGatewayClient', () => {
       'bypassPermissions',
       'default'
     ])
+  })
+
+  it('session.resume rehydrates the stored log into transcript rows', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+
+    const res = await w.client.request<{
+      info?: { model: string }
+      messages: Array<{ context?: string; name?: string; role: string; text?: string }>
+      running: boolean
+      session_id: string
+    }>('session.resume', { session_id: 'cc-resumed-1' })
+
+    expect((w.ctx.agents.resume as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
+    expect(res.session_id).toBe('cc-resumed-1')
+    expect(res.running).toBe(false)
+    expect(res.messages).toEqual([
+      { role: 'user', text: 'old prompt' },
+      { context: 'ls', name: 'bash', role: 'tool' },
+      { role: 'assistant', text: 'old reply' }
+    ])
+
+    // the binding switched: submissions now reach the resumed agent
+    await w.client.request('prompt.submit', { text: 'next' })
+    expect(w.resumedAgent.followup).toHaveBeenCalledTimes(1)
+  })
+
+  it('session.active_list reflects live agents and the current binding', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    await w.client.request('session.resume', { session_id: 'cc-resumed-1' })
+
+    const res = await w.client.request<{ sessions: Array<{ current?: boolean; id: string; status: string }> }>(
+      'session.active_list',
+      {}
+    )
+
+    const ids = res.sessions.map(s => s.id).sort()
+
+    expect(ids).toEqual([String((w.ctx.agents.create as ReturnType<typeof vi.fn>).mock.calls[0]![0].sessionId), 'cc-resumed-1'].sort())
+    expect(res.sessions.find(s => s.id === 'cc-resumed-1')?.current).toBe(true)
+  })
+
+  it('session.list serves persisted headers newest-first', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+
+    const res = await w.client.request<{ sessions: Array<{ id: string; started_at: number }> }>('session.list', {})
+
+    expect(res.sessions.map(s => s.id)).toEqual(['cc-old-2', 'cc-old-1'])
+  })
+
+  it('session.close disposes the live handle and session.title renames', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    await w.client.request('session.resume', { session_id: 'cc-resumed-1' })
+    await w.client.request('session.close', { session_id: 'cc-resumed-1' })
+    expect(w.resumedHandle.dispose).toHaveBeenCalledTimes(1)
+
+    // rebind to the original agent for the title call
+    const first = String((w.ctx.agents.create as ReturnType<typeof vi.fn>).mock.calls[0]![0].sessionId)
+
+    await w.client.request('session.activate', { session_id: first })
+    await expect(w.client.request('session.title', { title: 'My Task' })).resolves.toEqual({ title: 'My Task' })
+    await expect(w.client.request('session.title', {})).resolves.toEqual({ title: 'existing title' })
   })
 })
