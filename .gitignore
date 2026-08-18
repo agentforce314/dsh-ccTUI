@@ -1,1 +1,8 @@
 reference_projects/
+node_modules/
+dist/
+lib/
+*.tsbuildinfo
+.dsh-dev-home/
+*.log
+.DS_Store
