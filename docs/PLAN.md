@@ -128,5 +128,7 @@ Acceptance: docs merged to `main`.
 - 2026-08-18: Stage 3 merged (#3) — verbatim app copy, 1879 tests green, AppLayout mounts headless.
 - 2026-08-18: Stage 4 merged (#4) — harness gateway: real dsh boots the TUI as a cordis
   plugin; scripted end-to-end turn passes in a PTY e2e (also in CI).
-- 2026-08-18: Stage 5 — gates: approvals (sandbox escalation e2e round-trip), user questions,
-  plan review, permission-mode cycle.
+- 2026-08-18: Stage 5 merged (#5) — gates: approvals (sandbox escalation e2e round-trip),
+  user questions, plan review, permission-mode cycle.
+- 2026-08-18: Stage 6 — sessions: live-agent registry, resume/activate with transcript
+  rehydration, session list/close/title; two-phase resume e2e.
