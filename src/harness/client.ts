@@ -20,6 +20,7 @@ import type { AskUserQuestionAnswer, AskUserQuestionItem, AskUserQuestionRequest
 // Type-only: activates the 'plan/mode' SessionEventMap augmentation.
 import type {} from '@deepseek-ai/dsh-plan-mode'
 
+import { toolArgsPreview } from '../domain/toolArgs.js'
 import { GatewayClient, SLASHES } from '../gatewayClient.js'
 import { appHome } from '../lib/appHome.js'
 import { structuredPatch } from 'diff'
@@ -272,7 +273,7 @@ export class HarnessGatewayClient extends GatewayClient {
         case 'tool/call': {
           const { name, arguments: rawArgs } = (event as SessionEvent<'tool/call'>).data
 
-          rows.push({ context: prettyArgs(rawArgs), name, role: 'tool' })
+          rows.push({ context: toolArgsPreview(rawArgs), name, role: 'tool' })
           break
         }
 
@@ -396,7 +397,12 @@ export class HarnessGatewayClient extends GatewayClient {
         this.callArgs.set(id, prettyArgs(rawArgs))
         this.callRawArgs.set(id, rawArgs)
         this.publishLocalEvent({
-          payload: { args_text: prettyArgs(rawArgs), name, tool_id: id },
+          // `context` is the `⏺ Tool(args)` row's parenthesized half; the
+          // fuller `args_text` only surfaces behind ctrl+o. Without a context
+          // every row rendered as a bare `⏺ Read`, and the collapsed brief
+          // mis-bucketed shell calls it could no longer read a command out of
+          // ("Ran 1 shell command" for what is really "Listed 1 directory").
+          payload: { args_text: prettyArgs(rawArgs), context: toolArgsPreview(rawArgs), name, tool_id: id },
           session_id: this.sid,
           type: 'tool.start'
         })

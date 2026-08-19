@@ -216,7 +216,7 @@ describe('HarnessGatewayClient', () => {
 
     const toolStart = w.events[4] as Extract<GatewayEvent, { type: 'tool.start' }>
 
-    expect(toolStart.payload).toMatchObject({ args_text: 'ls', name: 'bash', tool_id: 'c1' })
+    expect(toolStart.payload).toMatchObject({ args_text: 'ls', context: 'ls', name: 'bash', tool_id: 'c1' })
 
     const toolDone = w.events[5] as Extract<GatewayEvent, { type: 'tool.complete' }>
 
@@ -228,6 +228,29 @@ describe('HarnessGatewayClient', () => {
     expect(complete.payload?.text).toBe('Hello')
     expect(complete.payload?.usage).toMatchObject({ calls: 1, input: 10, output: 5, total: 15 })
     expect(complete.payload?.session_turns).toBe(1)
+  })
+
+  it('gives every tool.start the salient argument its row renders in parens', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    w.fire('turn/start', { turn: 1 })
+    w.fire('tool/call', {
+      arguments: '{"file_path":"notes.txt","content":"alpha\\nbeta\\n"}',
+      callId: 'w1',
+      name: 'write',
+      step: 1,
+      turn: 1
+    })
+
+    const start = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.start' }>
+
+    // `⏺ Write(notes.txt)`, never the file body that would bury it.
+    expect(start.type).toBe('tool.start')
+    expect(start.payload.context).toBe('notes.txt')
   })
 
   it('marks failed tool results with an error', async () => {
