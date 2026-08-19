@@ -52,11 +52,11 @@ const WORKTREE_RPC_TIMEOUT_MS = 600_000
 const IMAGE_RPC_TIMEOUT_MS = 30_000
 // clawcodex app version shown in the banner ("clawcodex v{version}"). Keep in
 // sync with the installer (install.sh INSTALLER_VERSION).
-const CLAWCODEX_VERSION = '1.4.0'
+const DSH_CCTUI_VERSION = '1.4.0'
 
 /** Command that launches the clawcodex agent-server (set by the Python launcher). */
 function resolveAgentCmd(): string[] {
-  const raw = process.env.CLAWCODEX_AGENT_SERVER_CMD?.trim()
+  const raw = process.env.DSH_CCTUI_AGENT_SERVER_CMD?.trim()
 
   if (!raw) {return ['clawcodex', 'agent-server']}
 
@@ -140,7 +140,7 @@ function toolContext(input: any): string {
 
 /** Shorten an absolute path to a workspace-relative path (or basename). */
 function relativizePath(p: string): string {
-  const ws = (process.env.CLAWCODEX_WORKSPACE || process.env.CLAWCODEX_CWD || process.cwd()).replace(/\/+$/, '')
+  const ws = (process.env.DSH_CCTUI_WORKSPACE || process.env.DSH_CCTUI_CWD || process.cwd()).replace(/\/+$/, '')
 
   if (ws && p.startsWith(ws + '/')) {return p.slice(ws.length + 1)}
   const parts = p.split('/')
@@ -910,7 +910,7 @@ export class GatewayClient extends EventEmitter {
   // ── lifecycle ────────────────────────────────────────────────────────────
   start(): void {
     const cmd = resolveAgentCmd()
-    const cwd = process.env.CLAWCODEX_WORKSPACE || process.env.CLAWCODEX_CWD || process.cwd()
+    const cwd = process.env.DSH_CCTUI_WORKSPACE || process.env.DSH_CCTUI_CWD || process.cwd()
     const env = { ...process.env, PYTHONUNBUFFERED: '1' }
 
     this.readyTimer = setTimeout(() => {
@@ -1303,7 +1303,7 @@ export class GatewayClient extends EventEmitter {
         // success.
         if (action === 'install' || action === 'browse') {
           return Promise.reject(
-            new Error(`/skills ${action}: not supported in clawcodex — add skills under ~/.clawcodex/skills or .clawcodex/skills`)
+            new Error(`/skills ${action}: not supported here — the harness owns skills (ctx.skills)`)
           )
         }
 
@@ -2147,7 +2147,7 @@ export class GatewayClient extends EventEmitter {
   // resolve the dir part of the typed word, list it, filter by the basename).
   private completePath(word: string): Array<{ display: string; meta: string; text: string }> {
     try {
-      const cwd = process.env.CLAWCODEX_WORKSPACE || process.env.CLAWCODEX_CWD || process.cwd()
+      const cwd = process.env.DSH_CCTUI_WORKSPACE || process.env.DSH_CCTUI_CWD || process.cwd()
       const stripped = word.startsWith('@') ? word.slice(1) : word
       const slash = stripped.lastIndexOf('/')
       const dirPart = slash === -1 ? '' : stripped.slice(0, slash + 1)
@@ -2850,7 +2850,7 @@ export class GatewayClient extends EventEmitter {
       // The app gates "ready" on info.version (useSessionLifecycle:227) and the
       // banner shows it as "clawcodex v{version}", so this is the app version,
       // not the wire protocol_version.
-      version: CLAWCODEX_VERSION
+      version: DSH_CCTUI_VERSION
     } as SessionInfo
   }
 }

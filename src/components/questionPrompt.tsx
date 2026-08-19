@@ -1,4 +1,4 @@
-import { Box, Text, useInput } from '@clawcodex/ink'
+import { Box, Text, useInput } from '@dsh-cctui/ink'
 import { useMemo, useState } from 'react'
 
 import type { QuestionSpec } from '../gatewayTypes.js'

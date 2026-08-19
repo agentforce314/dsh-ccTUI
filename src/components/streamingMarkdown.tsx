@@ -28,7 +28,7 @@
 // already returns its own column Box, so its single-child case was never
 // affected.
 
-import { Box } from '@clawcodex/ink'
+import { Box } from '@dsh-cctui/ink'
 import { memo, useRef } from 'react'
 
 import type { Theme } from '../theme.js'

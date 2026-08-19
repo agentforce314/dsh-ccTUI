@@ -4,7 +4,7 @@ import inspector from 'node:inspector'
 import { performance } from 'node:perf_hooks'
 
 import React from 'react'
-import { render } from '@clawcodex/ink'
+import { render } from '@dsh-cctui/ink'
 import { AppLayout } from '../src/components/appLayout.tsx'
 import { resetOverlayState } from '../src/app/overlayStore.ts'
 import { resetTurnState } from '../src/app/turnStore.ts'

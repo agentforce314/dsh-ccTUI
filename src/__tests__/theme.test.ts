@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // `theme.js` reads `process.env` at module-load to compute DEFAULT_THEME,
 // and `fromSkin` closes over DEFAULT_THEME.  A developer shell with
-// CLAWCODEX_TUI_THEME=light (or CLAWCODEX_TUI_BACKGROUND set to something
+// DSH_CCTUI_THEME=light (or DSH_CCTUI_BACKGROUND set to something
 // bright) would flip the base and turn these assertions into a local-
 // only failure.  We sterilize the relevant env vars + dynamically
 // import the module fresh so EVERY symbol that closes over the env
@@ -12,9 +12,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 // `detectLightMode` takes env as an explicit arg, so it's safe to import
 // statically — but we stay consistent and dynamic-import it too.
 const RELEVANT_ENV = [
-  'CLAWCODEX_TUI_LIGHT',
-  'CLAWCODEX_TUI_THEME',
-  'CLAWCODEX_TUI_BACKGROUND',
+  'DSH_CCTUI_LIGHT',
+  'DSH_CCTUI_THEME',
+  'DSH_CCTUI_BACKGROUND',
   'COLORFGBG',
   'COLORTERM',
   'TERM_PROGRAM'
@@ -124,14 +124,14 @@ describe('detectLightMode', () => {
     expect(detectLightMode({ TERM_PROGRAM: 'Apple_Terminal' })).toBe(true)
   })
 
-  it('honors CLAWCODEX_TUI_LIGHT on/off', async () => {
+  it('honors DSH_CCTUI_LIGHT on/off', async () => {
     const { detectLightMode } = await importThemeWithCleanEnv()
 
-    expect(detectLightMode({ CLAWCODEX_TUI_LIGHT: '1' })).toBe(true)
-    expect(detectLightMode({ CLAWCODEX_TUI_LIGHT: 'true' })).toBe(true)
-    expect(detectLightMode({ CLAWCODEX_TUI_LIGHT: 'on' })).toBe(true)
-    expect(detectLightMode({ CLAWCODEX_TUI_LIGHT: '0' })).toBe(false)
-    expect(detectLightMode({ CLAWCODEX_TUI_LIGHT: 'off' })).toBe(false)
+    expect(detectLightMode({ DSH_CCTUI_LIGHT: '1' })).toBe(true)
+    expect(detectLightMode({ DSH_CCTUI_LIGHT: 'true' })).toBe(true)
+    expect(detectLightMode({ DSH_CCTUI_LIGHT: 'on' })).toBe(true)
+    expect(detectLightMode({ DSH_CCTUI_LIGHT: '0' })).toBe(false)
+    expect(detectLightMode({ DSH_CCTUI_LIGHT: 'off' })).toBe(false)
   })
 
   it('sniffs COLORFGBG bg slots 7 and 15 as light (#11300)', async () => {
@@ -157,31 +157,31 @@ describe('detectLightMode', () => {
     expect(detectLightMode({ COLORFGBG: '15;' })).toBe(false)
   })
 
-  it('lets CLAWCODEX_TUI_LIGHT=0 override a light COLORFGBG', async () => {
+  it('lets DSH_CCTUI_LIGHT=0 override a light COLORFGBG', async () => {
     const { detectLightMode } = await importThemeWithCleanEnv()
 
-    expect(detectLightMode({ COLORFGBG: '0;15', CLAWCODEX_TUI_LIGHT: '0' })).toBe(false)
+    expect(detectLightMode({ COLORFGBG: '0;15', DSH_CCTUI_LIGHT: '0' })).toBe(false)
   })
 
-  it('honors CLAWCODEX_TUI_THEME=light/dark as a symmetric explicit override', async () => {
+  it('honors DSH_CCTUI_THEME=light/dark as a symmetric explicit override', async () => {
     const { detectLightMode } = await importThemeWithCleanEnv()
 
-    expect(detectLightMode({ CLAWCODEX_TUI_THEME: 'light' })).toBe(true)
-    expect(detectLightMode({ CLAWCODEX_TUI_THEME: 'dark' })).toBe(false)
-    expect(detectLightMode({ COLORFGBG: '0;15', CLAWCODEX_TUI_THEME: 'dark' })).toBe(false)
-    expect(detectLightMode({ COLORFGBG: '15;0', CLAWCODEX_TUI_THEME: 'light' })).toBe(true)
+    expect(detectLightMode({ DSH_CCTUI_THEME: 'light' })).toBe(true)
+    expect(detectLightMode({ DSH_CCTUI_THEME: 'dark' })).toBe(false)
+    expect(detectLightMode({ COLORFGBG: '0;15', DSH_CCTUI_THEME: 'dark' })).toBe(false)
+    expect(detectLightMode({ COLORFGBG: '15;0', DSH_CCTUI_THEME: 'light' })).toBe(true)
   })
 
-  it('uses CLAWCODEX_TUI_BACKGROUND luminance when COLORFGBG is missing', async () => {
+  it('uses DSH_CCTUI_BACKGROUND luminance when COLORFGBG is missing', async () => {
     const { detectLightMode } = await importThemeWithCleanEnv()
 
-    expect(detectLightMode({ CLAWCODEX_TUI_BACKGROUND: '#ffffff' })).toBe(true)
-    expect(detectLightMode({ CLAWCODEX_TUI_BACKGROUND: '#000000' })).toBe(false)
-    expect(detectLightMode({ CLAWCODEX_TUI_BACKGROUND: '#1e1e1e' })).toBe(false)
+    expect(detectLightMode({ DSH_CCTUI_BACKGROUND: '#ffffff' })).toBe(true)
+    expect(detectLightMode({ DSH_CCTUI_BACKGROUND: '#000000' })).toBe(false)
+    expect(detectLightMode({ DSH_CCTUI_BACKGROUND: '#1e1e1e' })).toBe(false)
     // Three-char hex normalises like CSS.
-    expect(detectLightMode({ CLAWCODEX_TUI_BACKGROUND: '#fff' })).toBe(true)
+    expect(detectLightMode({ DSH_CCTUI_BACKGROUND: '#fff' })).toBe(true)
     // Garbage falls through to the default-dark path.
-    expect(detectLightMode({ CLAWCODEX_TUI_BACKGROUND: 'not-a-colour' })).toBe(false)
+    expect(detectLightMode({ DSH_CCTUI_BACKGROUND: 'not-a-colour' })).toBe(false)
   })
 
   it('rejects partially-invalid hex instead of silently truncating', async () => {
@@ -189,12 +189,12 @@ describe('detectLightMode', () => {
     // `parseInt('fffgff'.slice(2,4), 16)` would return 15 — the strict
     // regex must reject these inputs so they fall through to default-
     // dark instead of producing a false-positive light reading.
-    expect(detectLightMode({ CLAWCODEX_TUI_BACKGROUND: '#fffgff' })).toBe(false)
-    expect(detectLightMode({ CLAWCODEX_TUI_BACKGROUND: 'ffggff' })).toBe(false)
-    expect(detectLightMode({ CLAWCODEX_TUI_BACKGROUND: '#xyz' })).toBe(false)
+    expect(detectLightMode({ DSH_CCTUI_BACKGROUND: '#fffgff' })).toBe(false)
+    expect(detectLightMode({ DSH_CCTUI_BACKGROUND: 'ffggff' })).toBe(false)
+    expect(detectLightMode({ DSH_CCTUI_BACKGROUND: '#xyz' })).toBe(false)
     // Wrong length also rejected (no implicit padding/truncation).
-    expect(detectLightMode({ CLAWCODEX_TUI_BACKGROUND: '#fffff' })).toBe(false)
-    expect(detectLightMode({ CLAWCODEX_TUI_BACKGROUND: '#fffffff' })).toBe(false)
+    expect(detectLightMode({ DSH_CCTUI_BACKGROUND: '#fffff' })).toBe(false)
+    expect(detectLightMode({ DSH_CCTUI_BACKGROUND: '#fffffff' })).toBe(false)
   })
 
   it('treats COLORFGBG as authoritative when present so it dominates the TERM_PROGRAM allow-list', async () => {
@@ -214,7 +214,7 @@ describe('detectLightMode', () => {
 describe('fromSkin', () => {
   // `fromSkin` closes over DEFAULT_THEME (which is env-derived), so we
   // must dynamic-import it after sterilizing env — otherwise an ambient
-  // CLAWCODEX_TUI_THEME=light would flip the base palette and make these
+  // DSH_CCTUI_THEME=light would flip the base palette and make these
   // assertions order-dependent on the developer's shell.
 
   it('overrides banner colors', async () => {
@@ -394,11 +394,11 @@ describe('hasExplicitBackgroundSignal', () => {
 
     expect(hasExplicitBackgroundSignal({})).toBe(false)
     expect(hasExplicitBackgroundSignal({ TERM_PROGRAM: 'Apple_Terminal' })).toBe(false)
-    expect(hasExplicitBackgroundSignal({ CLAWCODEX_TUI_THEME: 'dark' })).toBe(true)
-    expect(hasExplicitBackgroundSignal({ CLAWCODEX_TUI_THEME: 'light' })).toBe(true)
-    expect(hasExplicitBackgroundSignal({ CLAWCODEX_TUI_LIGHT: '1' })).toBe(true)
-    expect(hasExplicitBackgroundSignal({ CLAWCODEX_TUI_LIGHT: 'off' })).toBe(true)
-    expect(hasExplicitBackgroundSignal({ CLAWCODEX_TUI_BACKGROUND: '#1a1a1a' })).toBe(true)
+    expect(hasExplicitBackgroundSignal({ DSH_CCTUI_THEME: 'dark' })).toBe(true)
+    expect(hasExplicitBackgroundSignal({ DSH_CCTUI_THEME: 'light' })).toBe(true)
+    expect(hasExplicitBackgroundSignal({ DSH_CCTUI_LIGHT: '1' })).toBe(true)
+    expect(hasExplicitBackgroundSignal({ DSH_CCTUI_LIGHT: 'off' })).toBe(true)
+    expect(hasExplicitBackgroundSignal({ DSH_CCTUI_BACKGROUND: '#1a1a1a' })).toBe(true)
     expect(hasExplicitBackgroundSignal({ COLORFGBG: '0;15' })).toBe(true)
     expect(hasExplicitBackgroundSignal({ COLORFGBG: '15;0' })).toBe(true)
   })
@@ -408,12 +408,12 @@ describe('hasExplicitBackgroundSignal', () => {
 
     const cases: Record<string, string>[] = [
       {},
-      { CLAWCODEX_TUI_THEME: 'dark' },
-      { CLAWCODEX_TUI_THEME: 'light' },
-      { CLAWCODEX_TUI_LIGHT: '1' },
-      { CLAWCODEX_TUI_LIGHT: '0' },
-      { CLAWCODEX_TUI_BACKGROUND: '#ffffff' },
-      { CLAWCODEX_TUI_BACKGROUND: '#000' },
+      { DSH_CCTUI_THEME: 'dark' },
+      { DSH_CCTUI_THEME: 'light' },
+      { DSH_CCTUI_LIGHT: '1' },
+      { DSH_CCTUI_LIGHT: '0' },
+      { DSH_CCTUI_BACKGROUND: '#ffffff' },
+      { DSH_CCTUI_BACKGROUND: '#000' },
       { COLORFGBG: '0;15' },
       { COLORFGBG: '0;7' },
       { COLORFGBG: '15;0' },

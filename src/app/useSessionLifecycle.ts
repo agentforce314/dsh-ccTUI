@@ -1,7 +1,7 @@
 import { writeFileSync } from 'node:fs'
 
-import type { ScrollBoxHandle } from '@clawcodex/ink'
-import { evictInkCaches } from '@clawcodex/ink'
+import type { ScrollBoxHandle } from '@dsh-cctui/ink'
+import { evictInkCaches } from '@dsh-cctui/ink'
 import { type RefObject, useCallback, useEffect, useRef } from 'react'
 
 import { buildSetupRequiredSections, SETUP_REQUIRED_TITLE } from '../content/setup.js'
@@ -41,7 +41,7 @@ const statusFromLiveSession = (status?: string, running = false) => {
   return running || status === 'working' ? 'running…' : 'ready'
 }
 
-export const writeActiveSessionFile = (sessionId: null | string, file = process.env.CLAWCODEX_TUI_ACTIVE_SESSION_FILE) => {
+export const writeActiveSessionFile = (sessionId: null | string, file = process.env.DSH_CCTUI_ACTIVE_SESSION_FILE) => {
   if (!file || !sessionId) {
     return
   }

@@ -36,7 +36,7 @@ class Sink {
 describe('AppLayout headless mount', () => {
   it('renders intro, transcript rows, and the composer prompt', async () => {
     const [{ render }, { AppLayout }, { GatewayProvider }, { resetOverlayState }, { resetTurnState }, { resetUiState }] = await Promise.all([
-      import('@clawcodex/ink'),
+      import('@dsh-cctui/ink'),
       import('../src/components/appLayout.js'),
       import('../src/app/gatewayContext.js'),
       import('../src/app/overlayStore.js'),

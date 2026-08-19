@@ -15,7 +15,7 @@ vi.mock('node:child_process', () => ({
   }
 }))
 
-import { renderSync } from '@clawcodex/ink'
+import { renderSync } from '@dsh-cctui/ink'
 import React from 'react'
 
 import { turnController } from '../app/turnController.js'
@@ -145,13 +145,13 @@ describe('ColorDiff layout', () => {
 // ── GatewayClient: tool_use_result → structured_diff ────────────────────────
 
 describe('GatewayClient structured diff mapping', () => {
-  const prevWs = process.env.CLAWCODEX_WORKSPACE
+  const prevWs = process.env.DSH_CCTUI_WORKSPACE
   let events: any[]
   let gw: GatewayClient
   let proc: FakeProc
 
   beforeEach(() => {
-    process.env.CLAWCODEX_WORKSPACE = '/ws'
+    process.env.DSH_CCTUI_WORKSPACE = '/ws'
     proc = new FakeProc()
     harness.proc = proc
     harness.spawnCalls = []
@@ -166,9 +166,9 @@ describe('GatewayClient structured diff mapping', () => {
     gw.kill()
 
     if (prevWs === undefined) {
-      delete process.env.CLAWCODEX_WORKSPACE
+      delete process.env.DSH_CCTUI_WORKSPACE
     } else {
-      process.env.CLAWCODEX_WORKSPACE = prevWs
+      process.env.DSH_CCTUI_WORKSPACE = prevWs
     }
   })
 

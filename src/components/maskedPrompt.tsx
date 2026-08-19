@@ -1,4 +1,4 @@
-import { Box, Text } from '@clawcodex/ink'
+import { Box, Text } from '@dsh-cctui/ink'
 import { useState } from 'react'
 
 import type { Theme } from '../theme.js'

@@ -39,7 +39,7 @@ await build({
   external: ['@deepseek-ai/*'],
   // Bundle the ink fork from source (the prebuilt bundle's __esm helper breaks
   // lazy-initialized exports like `render`).
-  alias: { '@clawcodex/ink': resolve(root, 'packages/clawcodex-ink/src/entry-exports.ts') },
+  alias: { '@dsh-cctui/ink': resolve(root, 'packages/dsh-cctui-ink/src/entry-exports.ts') },
   plugins: [stubDevtools],
   banner: {
     js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);"

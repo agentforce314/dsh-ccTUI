@@ -169,7 +169,7 @@ export class HarnessGatewayClient extends GatewayClient {
   }
 
   private workingDir(): string {
-    return this.opts.cwd ?? process.env.CLAWCODEX_WORKSPACE ?? process.env.CLAWCODEX_CWD ?? process.cwd()
+    return this.opts.cwd ?? process.env.DSH_CCTUI_WORKSPACE ?? process.env.DSH_CCTUI_CWD ?? process.cwd()
   }
 
   private async createAgent(fixedSessionId?: string): Promise<AgentHandle> {

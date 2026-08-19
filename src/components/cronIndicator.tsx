@@ -13,7 +13,7 @@
  * the backend's fire_at epochs; "due" shows once a fire time passes (the
  * worker pops it within its 0.5s idle poll).
  */
-import { Box, Text } from '@clawcodex/ink'
+import { Box, Text } from '@dsh-cctui/ink'
 import { useStore } from '@nanostores/react'
 import { memo, useEffect, useState } from 'react'
 

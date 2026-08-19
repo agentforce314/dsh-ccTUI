@@ -131,13 +131,13 @@ describe('formatToolResult with an image envelope', () => {
 // ── End to end through the gateway ─────────────────────────────────────────
 
 describe('GatewayClient image tool_result mapping', () => {
-  const prevWs = process.env.CLAWCODEX_WORKSPACE
+  const prevWs = process.env.DSH_CCTUI_WORKSPACE
   let events: any[]
   let gw: GatewayClient
   let proc: FakeProc
 
   beforeEach(() => {
-    process.env.CLAWCODEX_WORKSPACE = '/ws'
+    process.env.DSH_CCTUI_WORKSPACE = '/ws'
     proc = new FakeProc()
     harness.proc = proc
     harness.spawnCalls = []
@@ -152,9 +152,9 @@ describe('GatewayClient image tool_result mapping', () => {
     gw.kill()
 
     if (prevWs === undefined) {
-      delete process.env.CLAWCODEX_WORKSPACE
+      delete process.env.DSH_CCTUI_WORKSPACE
     } else {
-      process.env.CLAWCODEX_WORKSPACE = prevWs
+      process.env.DSH_CCTUI_WORKSPACE = prevWs
     }
   })
 

@@ -22,7 +22,7 @@ import { relative } from 'node:path'
  * resize/scroll and must not re-run highlighting + word diff each time
  * (mirrors the original's RENDER_CACHE, StructuredDiff.tsx).
  */
-import { Box, NoSelect, RawAnsi, Text } from '@clawcodex/ink'
+import { Box, NoSelect, RawAnsi, Text } from '@dsh-cctui/ink'
 import { memo, type ReactNode, useSyncExternalStore } from 'react'
 
 import { TRANSCRIPT_COLOR } from '../config/env.js'
@@ -131,7 +131,7 @@ const UpdateSummary = ({ added, removed }: { added: number; removed: number }) =
   )
 }
 
-const workspaceCwd = () => process.env.CLAWCODEX_WORKSPACE || process.env.CLAWCODEX_CWD || process.cwd()
+const workspaceCwd = () => process.env.DSH_CCTUI_WORKSPACE || process.env.DSH_CCTUI_CWD || process.cwd()
 
 export const DiffView = memo(function DiffView({ cols, diff, fallback = null, t }: DiffViewProps) {
   // Re-render once when highlight.js finishes registering grammars — rows

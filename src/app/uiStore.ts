@@ -20,7 +20,7 @@ const buildUiState = (): UiState => ({
   info: null,
   liveSessionCount: 0,
   inlineDiffs: true,
-  // Seeded synchronously from ~/.clawcodex/config.json so the banner's first
+  // Seeded synchronously from ~/.dsh-cctui/config.json so the banner's first
   // paint is already in the chosen palette (the backend isn't up yet).
   logoPalette: readLogoColorSync(),
   mouseTracking: MOUSE_TRACKING,

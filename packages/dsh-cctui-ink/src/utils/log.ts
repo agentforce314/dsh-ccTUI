@@ -1,5 +1,5 @@
 export function logError(error: unknown): void {
-  if (!process.env.CLAWCODEX_INK_DEBUG_ERRORS) {
+  if (!process.env.DSH_CCTUI_INK_DEBUG_ERRORS) {
     return
   }
 

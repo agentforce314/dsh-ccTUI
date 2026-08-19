@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 
-import { renderSync } from '@clawcodex/ink'
+import { renderSync } from '@dsh-cctui/ink'
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 

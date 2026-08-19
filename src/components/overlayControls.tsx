@@ -1,4 +1,4 @@
-import { Text, useInput } from '@clawcodex/ink'
+import { Text, useInput } from '@dsh-cctui/ink'
 
 import type { Theme } from '../theme.js'
 

@@ -12,14 +12,14 @@ export const isTermuxEnv = (env: NodeJS.ProcessEnv = process.env): boolean => {
  * Return true when Clawcodex should enable Termux-focused TUI defaults.
  *
  * Defaults to on in Termux, with an explicit opt-out for debugging:
- *   CLAWCODEX_TUI_TERMUX_MODE=0
+ *   DSH_CCTUI_TERMUX_MODE=0
  */
 export const isTermuxTuiMode = (env: NodeJS.ProcessEnv = process.env): boolean => {
   if (!isTermuxEnv(env)) {
     return false
   }
 
-  const override = String(env.CLAWCODEX_TUI_TERMUX_MODE ?? '')
+  const override = String(env.DSH_CCTUI_TERMUX_MODE ?? '')
     .trim()
     .toLowerCase()
 

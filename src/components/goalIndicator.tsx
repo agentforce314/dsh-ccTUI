@@ -12,7 +12,7 @@
  * that the goal is still armed. Elapsed comes off the backend's created_at,
  * so pause→resume keeps the original clock and a restore starts a fresh one.
  */
-import { Box, Text } from '@clawcodex/ink'
+import { Box, Text } from '@dsh-cctui/ink'
 import { useStore } from '@nanostores/react'
 import { memo, useEffect, useState } from 'react'
 

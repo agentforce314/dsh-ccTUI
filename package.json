@@ -1,6 +1,6 @@
 {
   "name": "dsh-cctui",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Claude-Code-style terminal UI for deepseek-harness, ported from clawcodex ui-tui",
   "license": "MIT",
   "repository": {
@@ -12,7 +12,7 @@
     "node": ">=22.19"
   },
   "scripts": {
-    "build:ink": "npm run build --prefix packages/clawcodex-ink",
+    "build:ink": "npm run build --prefix packages/dsh-cctui-ink",
     "dev": "npm run build:ink && tsx --watch src/entry.tsx",
     "start": "tsx src/entry.tsx",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -28,7 +28,7 @@
     "e2e:install": "npm run build && python3 scripts/e2e/run_install.py"
   },
   "dependencies": {
-    "@clawcodex/ink": "file:./packages/clawcodex-ink",
+    "@dsh-cctui/ink": "file:./packages/dsh-cctui-ink",
     "@nanostores/react": "^1.1.0",
     "diff": "^9.0.0",
     "highlight.js": "^11.11.1",

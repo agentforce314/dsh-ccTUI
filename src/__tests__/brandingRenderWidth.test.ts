@@ -1,6 +1,6 @@
 import { PassThrough } from 'stream'
 
-import { Box, renderSync, ScrollBox, stringWidth } from '@clawcodex/ink'
+import { Box, renderSync, ScrollBox, stringWidth } from '@dsh-cctui/ink'
 import React from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 

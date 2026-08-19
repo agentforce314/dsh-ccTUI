@@ -4,7 +4,7 @@
  * keeping/removing state) on the clawcodex prompt-overlay chassis
  * (ConfirmPrompt's select styling).
  */
-import { Box, Text, useInput } from '@clawcodex/ink'
+import { Box, Text, useInput } from '@dsh-cctui/ink'
 import { useState } from 'react'
 
 import type { Theme } from '../theme.js'

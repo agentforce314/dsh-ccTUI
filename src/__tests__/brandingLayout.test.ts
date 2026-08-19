@@ -1,4 +1,4 @@
-import { stringWidth } from '@clawcodex/ink'
+import { stringWidth } from '@dsh-cctui/ink'
 import { describe, expect, it } from 'vitest'
 
 import {

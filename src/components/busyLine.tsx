@@ -18,7 +18,7 @@
  *   deliberate delta from the original's bare row (that signal is
  *   load-bearing here).
  */
-import { Box, stringWidth, Text } from '@clawcodex/ink'
+import { Box, stringWidth, Text } from '@dsh-cctui/ink'
 import { useStore } from '@nanostores/react'
 import { memo, useEffect, useMemo, useState } from 'react'
 

@@ -1,4 +1,4 @@
-import { wrapAnsi } from '@clawcodex/ink'
+import { wrapAnsi } from '@dsh-cctui/ink'
 import { describe, expect, it } from 'vitest'
 
 import { offsetFromPosition } from '../components/textInput.js'

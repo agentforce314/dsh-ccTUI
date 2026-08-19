@@ -12,7 +12,7 @@
  * React wrapper only has to print each line in a <Text>.
  *
  * Local deltas vs the upstream file (kept minimal for re-sync):
- *   - stringWidth: the `@clawcodex/ink` fork helper (the same measurement the
+ *   - stringWidth: the `@dsh-cctui/ink` fork helper (the same measurement the
  *     surrounding layout uses).
  *   - logError: silent no-op (writing to stderr would corrupt the TUI).
  *   - highlight.js loaded via lazy dynamic import(): the deployed TUI is a
@@ -32,7 +32,7 @@
 
 import { basename, extname } from 'node:path'
 
-import { stringWidth } from '@clawcodex/ink'
+import { stringWidth } from '@dsh-cctui/ink'
 import { diffArrays } from 'diff'
 import type { HLJSApi } from 'highlight.js'
 

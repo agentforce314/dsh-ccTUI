@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 
-import { renderSync } from '@clawcodex/ink'
+import { renderSync } from '@dsh-cctui/ink'
 import React from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -11,7 +11,7 @@ vi.mock('node:child_process', () => ({ spawn: () => new EventEmitter() }))
 
 // Styled-output assertions need a color-capable terminal profile — the
 // renderer snapshots support at module load, so hoist the env ahead of the
-// @clawcodex/ink import (PassThrough stdout has isTTY=false otherwise).
+// @dsh-cctui/ink import (PassThrough stdout has isTTY=false otherwise).
 vi.hoisted(() => {
   process.env.FORCE_COLOR = '3'
   process.env.COLORTERM = 'truecolor'

@@ -1,4 +1,4 @@
-import { forceRedraw, useInput } from '@clawcodex/ink'
+import { forceRedraw, useInput } from '@dsh-cctui/ink'
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef } from 'react'
 

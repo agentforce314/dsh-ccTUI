@@ -1,6 +1,6 @@
 import type * as React from 'react'
 
-declare module '@clawcodex/ink' {
+declare module '@dsh-cctui/ink' {
   export type Key = {
     readonly ctrl: boolean
     readonly meta: boolean

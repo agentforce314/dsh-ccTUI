@@ -143,7 +143,7 @@ observed behavior instead of leaving it skipped.
 - brand: name `dsh-ccTUI`, icon 🐳; tagline "Claude Code style TUI for Deepseek-Harness"
   (mid tier: "Claude Code style TUI"; tiny tier: "dsh-ccTUI").
 - Every user-visible "clawcodex" string was renamed; functional identifiers stay
-  (CLAWCODEX_* env vars, ~/.clawcodex data dir, @clawcodex/ink package name).
+  (CLAWCODEX_* env vars, ~/.clawcodex data dir, @dsh-cctui/ink package name).
 - Identifier rename: every `cc-tui` token became `cctui` (package `dsh-cctui`, row id
   `cctui`, bin `dsh-cctui`, env prefix `DSH_CCTUI_*`); the default profile is `dsh-cctui`.
 - SessionInfo.version now carries the real plugin version (package.json, resolved from
@@ -168,3 +168,19 @@ observed behavior instead of leaving it skipped.
 - Testing lesson that caused this: the v0.2.0 e2e asserted banner *glyphs* but never the
   SGR *colors*, so a stale palette passed. The e2e now asserts every brand-colored run in
   the banner region is blue-dominant, and a unit test pins the default ramp to ocean.
+
+## Stage 12 — fork and identifier rename (v0.3.0)
+
+- `packages/clawcodex-ink` → `packages/dsh-cctui-ink`, package `@clawcodex/ink` →
+  `@dsh-cctui/ink` (143 files, ~29k LOC; 96 import sites, three esbuild aliases, the ambient
+  `.d.ts` module declaration, tsconfig paths and the vitest excludes). It is a vendored fork
+  of Ink that this repo ships and bundles, so carrying another product's brand in its
+  package identity was wrong; MIT permits the rename and NOTICE.md keeps the attribution
+  (renaming never removes credit).
+- Environment knobs `CLAWCODEX_*` / `CLAWCODEX_TUI_*` → `DSH_CCTUI_*` (49 names; the
+  redundant `TUI_` infix was dropped, e.g. `CLAWCODEX_TUI_INLINE` → `DSH_CCTUI_INLINE`).
+  `CLAUDE_CODE_SCROLL_SPEED` is deliberately KEPT as a migration fallback — it is another
+  product's knob read for interop, not our branding.
+- Remaining "clawcodex" mentions in the tree are provenance comments ("ported from …") and
+  the dead Python-gateway test fixtures; those describe history and stay.
+- The inert `/memory` feature's file name became `DSH-CCTUI.md` under `~/.dsh-cctui`.

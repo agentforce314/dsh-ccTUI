@@ -1,6 +1,6 @@
 import { userInfo } from 'os'
 
-import { applyColor, Box, stringWidth, Text, useStdout } from '@clawcodex/ink'
+import { applyColor, Box, stringWidth, Text, useStdout } from '@dsh-cctui/ink'
 import { useEffect, useState } from 'react'
 import unicodeSpinners from 'unicode-animations'
 
