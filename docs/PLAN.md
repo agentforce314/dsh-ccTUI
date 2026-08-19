@@ -56,7 +56,7 @@ Deliverables: `docs/PLAN.md`, `docs/ARCHITECTURE.md`, `README.md`, `LICENSE`, `N
 Acceptance: docs merged to `main`.
 
 ### Stage 2 — Toolchain + vendored Ink fork
-- Root `package.json` (`dsh-cc-tui`, ESM, React 19, `file:` dep on the fork), `tsconfig.json`,
+- Root `package.json` (`dsh-cctui`, ESM, React 19, `file:` dep on the fork), `tsconfig.json`,
   `vitest.config.ts`, CI workflow (typecheck + vitest).
 - Vendor `packages/clawcodex-ink` unchanged (esbuild build, root `index.js` shims).
 - Acceptance: fork builds; its own unit tests pass; a headless `renderSync` smoke test renders
@@ -104,7 +104,7 @@ Acceptance: docs merged to `main`.
 - Merge local registry + `ctx.commands` catalog (`commands.catalog`, `slash.exec`,
   `command.dispatch`, `commands/change` refresh); `complete.slash` + `complete.path`.
 - `/model` via `ctx.llm` catalog + `installModelSelection` + `ctx.agentDefaultModel`; `/compact`
-  via `ctx.compaction`; `/status`, `/help`, `/usage`; `config.get/set` over a `dsh-cc-tui`
+  via `ctx.compaction`; `/status`, `/help`, `/usage`; `config.get/set` over a `dsh-cctui`
   settings namespace.
 - Acceptance: e2e slash dispatch of a harness-registered command; model switch reflected in
   `session.info`.
@@ -117,7 +117,7 @@ Acceptance: docs merged to `main`.
 - Acceptance: e2e scripted Edit tool shows the diff card; todos render; context % moves.
 
 ### Stage 9 — Packaging, launcher, final QA
-- `bin/dsh-cc-tui.js` launcher (profile bootstrap via `dsh plugin add`, version-skew guard,
+- `bin/dsh-cctui.js` launcher (profile bootstrap via `dsh plugin add`, version-skew guard,
   `NODE_ENV=production`), `install.sh`, packaged `files` list, README usage docs.
 - Fresh-`DSH_HOME` install e2e from a local checkout; tag `v0.1.0`.
 - Acceptance: `./install.sh` on a clean profile launches the TUI.

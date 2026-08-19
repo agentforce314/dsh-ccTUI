@@ -33,7 +33,7 @@ const buildUiState = (): UiState => ({
   sessionStats: ZERO_SESSION_STATS,
   showReasoning: false,
   sid: null,
-  status: 'starting clawcodex…',
+  status: 'starting dsh-ccTUI…',
   statusBar: 'off',
   streaming: true,
   theme: DEFAULT_THEME,

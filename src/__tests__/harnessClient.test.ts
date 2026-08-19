@@ -281,7 +281,7 @@ describe('HarnessGatewayClient', () => {
 
     // The requested id is freshly generated; the binding then adopts the
     // agent's own id (identical in a real harness, distinct in this fake).
-    expect(String(createOpts.sessionId)).toMatch(/^cc-tui-/)
+    expect(String(createOpts.sessionId)).toMatch(/^cctui-/)
     expect(res.session_id).toBe(String(w.agent.id))
   })
 

@@ -54,59 +54,50 @@ export function parseRichMarkup(markup: string): Line[] {
 }
 
 const LOGO_ART = [
-  ' ██████╗██╗      █████╗ ██╗    ██╗ ██████╗ ██████╗ ██████╗ ███████╗██╗  ██╗',
-  '██╔════╝██║     ██╔══██╗██║    ██║██╔════╝██╔═══██╗██╔══██╗██╔════╝╚██╗██╔╝',
-  '██║     ██║     ███████║██║ █╗ ██║██║     ██║   ██║██║  ██║█████╗   ╚███╔╝ ',
-  '██║     ██║     ██╔══██║██║███╗██║██║     ██║   ██║██║  ██║██╔══╝   ██╔██╗ ',
-  '╚██████╗███████╗██║  ██║╚███╔███╔╝╚██████╗╚██████╔╝██████╔╝███████╗██╔╝ ██╗',
-  ' ╚═════╝╚══════╝╚═╝  ╚═╝ ╚══╝╚══╝  ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝'
+  '██████╗ ███████╗██╗  ██╗         ██████╗ ██████╗████████╗██╗   ██╗██╗',
+  '██╔══██╗██╔════╝██║  ██║        ██╔════╝██╔════╝╚══██╔══╝██║   ██║██║',
+  '██║  ██║███████╗███████║ █████╗ ██║     ██║        ██║   ██║   ██║██║',
+  '██║  ██║╚════██║██╔══██║ ╚════╝ ██║     ██║        ██║   ██║   ██║██║',
+  '██████╔╝███████║██║  ██║        ╚██████╗╚██████╗   ██║   ╚██████╔╝██║',
+  '╚═════╝ ╚══════╝╚═╝  ╚═╝         ╚═════╝ ╚═════╝   ╚═╝    ╚═════╝ ╚═╝'
 ]
 
-// clawcodex mascot — a lobster. Rendered in the brand terracotta gradient
-// (which reads as lobster-red), shown beside the session panel on the banner.
-const LOBSTER_ART = [
-  '(\\/)        (\\/)',
-  ' \\\\__      __//',
-  '   \\( o  o )/',
-  '    |======|',
-  '   /|======|\\',
-  '   \\\\______//'
+// dsh-ccTUI mascot — a blue whale, matching the DeepSeek brand. Painted from
+// the active /logo gradient (default: whale blues), beside the session panel.
+const WHALE_ART = [
+  '       : \' :',
+  '    ___\'_______',
+  '  /\'  o        \\--.',
+  ' |              ___\\',
+  '  \\____________/  \\/',
+  '     \\__/  \\__/'
 ]
 
-// Claude Code "sunset" logo gradient — warm peach down to deep terracotta,
-// independent of the active theme palette so the wordmark always reads as brand.
-const LOGO_SUNSET = [
-  'rgb(245,166,120)',
-  'rgb(233,147,107)',
-  'rgb(221,128,94)',
-  'rgb(208,113,84)',
-  'rgb(193,102,77)',
-  'rgb(178,90,70)'
+// DeepSeek "whale" logo gradient — sky blue down to deep sea, anchored on the
+// DeepSeek brand blue #4D6BFE, independent of the active theme palette so the
+// wordmark always reads as brand.
+const LOGO_BRAND = [
+  'rgb(150,180,255)',
+  'rgb(110,145,255)',
+  'rgb(77,107,254)',
+  'rgb(56,82,215)',
+  'rgb(40,60,170)',
+  'rgb(28,42,120)'
 ] as const
 
-// Claws/arms in accent, body in primary, tail in accent — both are the brand
-// terracotta, so the whole mascot reads lobster-red.
-const LOBSTER_GRADIENT = [1, 1, 0, 0, 0, 1] as const
-
-const colorize = (art: string[], gradient: readonly number[], c: ThemeColors): Line[] => {
-  const p = [c.primary, c.accent, c.border, c.muted]
-
-  return art.map((text, i) => [p[gradient[i]!] ?? c.muted, text])
-}
-
 export const LOGO_WIDTH = Math.max(...LOGO_ART.map(line => line.length))
-export const LOBSTER_WIDTH = Math.max(...LOBSTER_ART.map(line => line.length))
+export const WHALE_WIDTH = Math.max(...WHALE_ART.map(line => line.length))
 
 // /logo palette → banner painting (applied at the banner's startup paint; the
 // intro row is committed to scrollback, so a mid-session /logo shows on the
 // NEXT launch, matching the original). The unset default AND an explicit
-// "sunset" both keep the shipped look (brand LOGO_SUNSET wordmark,
-// theme-colored lobster): "Sunset (default)" IS clawcodex's default scheme,
-// and picking it must return exactly to it. Only a non-default palette
-// changes the paint — wordmark rows one gradient stop each, lobster rows
-// sampled from the same gradient so the mascot doesn't clash
-// terracotta-on-ocean. Skin overrides (customLogo / customHero) win over the
-// palette: a skin is a full rebrand, /logo recolors the default logo.
+// "whale" both keep the shipped look (brand LOGO_BRAND wordmark, whale-blue
+// mascot): "Whale (default)" IS dsh-ccTUI's default scheme, and picking it
+// must return exactly to it. Only a non-default palette changes the paint —
+// wordmark rows one gradient stop each, mascot rows sampled from the same
+// gradient so the whale never clashes with the wordmark. Skin overrides
+// (customLogo / customHero) win over the palette: a skin is a full rebrand,
+// /logo recolors the default logo.
 const nonDefaultPalette = (logoColor?: string): LogoPaletteName | null =>
   logoColor && logoColor !== DEFAULT_LOGO_PALETTE && isLogoPaletteName(logoColor) ? logoColor : null
 
@@ -115,7 +106,7 @@ const nonDefaultPalette = (logoColor?: string): LogoPaletteName | null =>
 export const wordmarkGradient = (logoColor?: string): string[] => {
   const name = nonDefaultPalette(logoColor)
 
-  return name ? LOGO_PALETTES[name].gradient.map(rgbStr) : [...LOGO_SUNSET]
+  return name ? LOGO_PALETTES[name].gradient.map(rgbStr) : [...LOGO_BRAND]
 }
 
 export const logo = (c: ThemeColors, customLogo?: string, logoColor?: string): Line[] => {
@@ -128,20 +119,15 @@ export const logo = (c: ThemeColors, customLogo?: string, logoColor?: string): L
   return LOGO_ART.map((text, i) => [grad[i] ?? c.primary, text])
 }
 
-export const lobster = (c: ThemeColors, customHero?: string, logoColor?: string): Line[] => {
+export const whale = (_c: ThemeColors, customHero?: string, logoColor?: string): Line[] => {
   if (customHero) {
     return parseRichMarkup(customHero)
   }
 
   const name = nonDefaultPalette(logoColor)
+  const stops = name ? LOGO_PALETTES[name].gradient : LOGO_PALETTES[DEFAULT_LOGO_PALETTE].gradient
 
-  if (name) {
-    const stops = LOGO_PALETTES[name].gradient
-
-    return LOBSTER_ART.map((text, i) => [rgbStr(gradientStopForRow(stops, i, LOBSTER_ART.length)), text])
-  }
-
-  return colorize(LOBSTER_ART, LOBSTER_GRADIENT, c)
+  return WHALE_ART.map((text, i) => [rgbStr(gradientStopForRow(stops, i, WHALE_ART.length)), text])
 }
 
 // Measured in columns, not code units: this feeds the header's left-column

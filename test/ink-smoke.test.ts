@@ -19,7 +19,7 @@ describe('vendored @clawcodex/ink fork', () => {
       createElement(
         Box,
         { borderStyle: 'round', paddingX: 1 },
-        createElement(Text, { color: 'green' }, 'dsh-cc-tui smoke')
+        createElement(Text, { color: 'green' }, 'dsh-cctui smoke')
       ),
       // @ts-expect-error test streams stand in for process streams
       { stdout, stdin, stderr: new PassThrough(), exitOnCtrlC: false, patchConsole: false }
@@ -28,7 +28,7 @@ describe('vendored @clawcodex/ink fork', () => {
     // The renderer may emit padding as cursor moves rather than literal spaces,
     // so assert word-by-word rather than on exact spacing.
     const plain = output.replace(ansiPattern, '')
-    expect(plain).toContain('dsh-cc-tui')
+    expect(plain).toContain('dsh-cctui')
     expect(plain).toContain('smoke')
     expect(plain).toContain('╭')
   })

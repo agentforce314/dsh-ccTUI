@@ -53,7 +53,7 @@ export function recordParentLifecycle(line: string): void {
   } catch {
     if (!warned) {
       warned = true
-      process.stderr.write('clawcodex-tui: parent lifecycle log unavailable\n')
+      process.stderr.write('dsh-ccTUI: parent lifecycle log unavailable\n')
     }
   }
 }

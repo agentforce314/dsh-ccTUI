@@ -1,9 +1,9 @@
-# dsh-cc-tui
+# dsh-ccTUI
 
-A Claude-Code-style terminal UI for [deepseek-harness](https://deepseek-harness.github.io/deepseek-harness/),
-ported from the clawcodex `ui-tui` and packaged as a `dsh` bundle plugin.
+**Claude Code style TUI for Deepseek-Harness** — 🐳 ported from the clawcodex `ui-tui` and
+packaged as a `dsh` bundle plugin (npm package `dsh-cctui`).
 
-The full clawcodex look, feel, and interactions — streaming markdown transcript, tool trail
+The full Claude-Code-style look, feel, and interactions — streaming markdown transcript, tool trail
 with diff cards, approval and question prompts, plan review, session switcher and resume,
 slash commands, model picker, context bar — running **in-process** against harness services
 (`ctx.agents`, `session/event`, the approval waterfall, `ctx.userQuestions`, `ctx.commands`).
@@ -15,12 +15,12 @@ Requires Node ≥ 22.19, npm, pnpm, and the `dsh` CLI (`npm install -g @deepseek
 ```sh
 git clone https://github.com/agentforce314/dsh-ccTUI.git
 cd dsh-ccTUI
-./install.sh          # builds, then: dsh plugin --profile cc-tui add "$PWD"
-dsh --profile cc-tui  # launch (or ./bin/dsh-cc-tui.js)
+./install.sh           # builds, then: dsh plugin --profile dsh-cctui add "$PWD"
+dsh --profile dsh-cctui # launch (or ./bin/dsh-cctui.js)
 ```
 
 Model/provider configuration comes from your dsh profile (`agent-default-model` settings or
-an `- id: cc-tui` config override in the profile's `cordis.patch.yml`: `provider`, `model`,
+an `- id: cctui` config override in the profile's `cordis.patch.yml`: `provider`, `model`,
 `cwd`, `sessionId`).
 
 ## Highlights

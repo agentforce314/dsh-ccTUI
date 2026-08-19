@@ -429,7 +429,7 @@ export const sessionCommands: SlashCommand[] = [
   {
     aliases: ['mode'],
     argumentHint: `[${PERMISSION_LEVEL_KEYS.join('|')}]`,
-    help: 'choose what clawcodex is allowed to do',
+    help: 'choose what dsh-ccTUI is allowed to do',
     name: 'permissions',
     usage: `/permissions [${PERMISSION_LEVEL_KEYS.join('|')}]`,
     // Bare /permissions opens the three-level picker (lib/permissionLevels.ts);

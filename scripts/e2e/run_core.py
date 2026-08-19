@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """End-to-end suite: boot the real dsh (from this repo's node_modules) with
-the dsh-base bundle + the built cc-tui plugin + a scripted mock LLM, inside a
+the dsh-base bundle + the built cctui plugin + a scripted mock LLM, inside a
 real PTY, and drive full user scenarios.
 
 Phase 1 (fixed session id): conversation loop + sandbox-escalation approval.
@@ -56,7 +56,7 @@ def bootstrap(fixed_session: str | None) -> None:
 - insert:
     - id: mock-llm
       name: '{ROOT}/test/e2e/mock-llm.mjs'
-    - id: cc-tui
+    - id: cctui
       name: '{ROOT}/dist/plugin.js'
       config:
         provider: mock
@@ -207,6 +207,8 @@ class TuiSession:
 
 
 def phase1(failures: list[str]) -> None:
+    # the write-tool scenario must CREATE the probe file, not update a leftover
+    (ROOT / "e2e-scratch" / "e2e-write-probe.txt").unlink(missing_ok=True)
     bootstrap(FIXED_SID)
     s = TuiSession("phase1")
     try:

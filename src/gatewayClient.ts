@@ -777,7 +777,7 @@ export const SLASHES: ReadonlyArray<{ desc: string; hint?: string; name: string 
   { desc: 'Switch the model', name: '/model' },
   { desc: 'Set the output style', hint: '[<name>]', name: '/output-style' },
   { desc: 'Change the startup logo color scheme', name: '/logo' },
-  { desc: 'Choose what clawcodex is allowed to do', name: '/permissions' },
+  { desc: 'Choose what dsh-ccTUI is allowed to do', name: '/permissions' },
   { desc: 'Compact the conversation to save context', name: '/compact' },
   { desc: 'Show context-window usage', name: '/context' },
   { desc: 'Show the total cost and duration of the current session', name: '/cost' },
@@ -837,7 +837,7 @@ export const SLASHES: ReadonlyArray<{ desc: string; hint?: string; name: string 
   { desc: 'List or start background agents', name: '/bg' },
   { desc: 'Resume a past session', name: '/resume' },
   { desc: 'Rename this session', hint: '<name>', name: '/rename' },
-  { desc: 'Exit clawcodex', name: '/exit' }
+  { desc: 'Exit dsh-ccTUI', name: '/exit' }
 ]
 
 type Pending = { reject: (e: Error) => void; resolve: (v: unknown) => void }

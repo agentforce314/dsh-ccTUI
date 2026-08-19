@@ -123,13 +123,30 @@ observed behavior instead of leaving it skipped.
 ## Stage 9 — packaging & install
 
 - Distribution is checkout-based: `./install.sh` builds locally then
-  `dsh plugin --profile cc-tui add <checkout>` (a pnpm link install). The bundle's
-  cordis.patch.yml supplies the cc-tui row; module resolution from the linked checkout finds
+  `dsh plugin --profile dsh-cctui add <checkout>` (a pnpm link install). The bundle's
+  cordis.patch.yml supplies the cctui row; module resolution from the linked checkout finds
   the repo's own node_modules, so the plugin externals resolve without touching the profile.
-- `bin/dsh-cc-tui.js` is a thin launcher (probe dsh, verify the profile, exec
-  `dsh --profile cc-tui` with NODE_ENV=production).
+- `bin/dsh-cctui.js` is a thin launcher (probe dsh, verify the profile, exec
+  `dsh --profile dsh-cctui` with NODE_ENV=production).
 - The installed path has its own e2e (`npm run e2e:install`, in CI): scratch DSH_HOME,
   real `dsh plugin add`, boot with only a mock-LLM overlay patch, one streamed turn.
 - Not ported (backend never fires them, UI degrades silently): billing/credits, voice,
   pets gallery (pet RPCs resolve empty), browser progress, worktree exit flow, rollback,
   memory targets, sudo/secret prompts.
+
+## Stage 10 — DeepSeek rebrand (v0.2.0)
+
+- Wordmark: DSH-CCTUI in the same ANSI-shadow style (69 cols, hand-assembled, uniform width).
+- Mascot: the lobster became a blue whale; it now always paints from the active /logo
+  gradient (default: the new `whale` palette, anchored on DeepSeek blue #4D6BFE). `sunset`
+  remains selectable; `/logo` grammar gained `whale`.
+- brand: name `dsh-ccTUI`, icon 🐳; tagline "Claude Code style TUI for Deepseek-Harness"
+  (mid tier: "Claude Code style TUI"; tiny tier: "dsh-ccTUI").
+- Every user-visible "clawcodex" string was renamed; functional identifiers stay
+  (CLAWCODEX_* env vars, ~/.clawcodex data dir, @clawcodex/ink package name).
+- Identifier rename: every `cc-tui` token became `cctui` (package `dsh-cctui`, row id
+  `cctui`, bin `dsh-cctui`, env prefix `DSH_CCTUI_*`); the default profile is `dsh-cctui`.
+- SessionInfo.version now carries the real plugin version (package.json, resolved from
+  dist/ or src/), so the panel reads "dsh-ccTUI v0.2.0".
+- e2e determinism fix: the write-tool scenario deletes its probe file first — a leftover
+  file turned the create into an update and hit the read-before-write observation policy.

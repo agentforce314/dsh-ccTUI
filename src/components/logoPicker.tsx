@@ -80,7 +80,7 @@ export function LogoPicker({ current, onClose, onSelect, t }: LogoPickerProps) {
 }
 
 interface LogoPickerProps {
-  /** The active palette name ('' = default sunset). */
+  /** The active palette name ('' = default whale). */
   current: string
   onClose: () => void
   onSelect: (name: LogoPaletteName) => void

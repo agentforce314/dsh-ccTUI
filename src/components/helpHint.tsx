@@ -9,7 +9,7 @@ const COMMON_COMMANDS: [string, string][] = [
   ['/resume', 'switch live or resume past sessions'],
   ['/details', 'control transcript detail level'],
   ['/copy', 'copy selection or last assistant message'],
-  ['/exit', 'exit clawcodex']
+  ['/exit', 'exit dsh-ccTUI']
 ]
 
 // 9 rows so the link-opening gesture (inserted near the top when the
