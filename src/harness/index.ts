@@ -1,11 +1,11 @@
-// Cordis plugin surface for dsh-cc-tui. Kept minimal: the loader reads
+// Cordis plugin surface for dsh-cctui. Kept minimal: the loader reads
 // name/inject/Config synchronously; the heavy TUI wiring lives in plugin.ts
 // behind a dynamic import so a boot failure surfaces as a plugin error
 // instead of a module-load crash.
 import type { Context } from '@deepseek-ai/cordis'
 import Schema from '@deepseek-ai/schemastery'
 
-export const name = 'dsh-cc-tui'
+export const name = 'dsh-cctui'
 
 // Code-level inject stays minimal (the agent registry is the one hard
 // requirement); optional services are soft-probed with ctx.get so the plugin

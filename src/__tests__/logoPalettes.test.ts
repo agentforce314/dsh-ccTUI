@@ -4,7 +4,7 @@ import { join } from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { lobster, logo, wordmarkGradient } from '../banner.js'
+import { logo, whale, wordmarkGradient } from '../banner.js'
 import {
   DEFAULT_LOGO_PALETTE,
   gradientStopForRow,
@@ -19,26 +19,28 @@ import { DEFAULT_THEME } from '../theme.js'
 
 const C = DEFAULT_THEME.color
 
-// The shipped brand ramp (banner.ts LOGO_SUNSET) — the default look that unset
-// AND explicit "sunset" must both keep.
-const BRAND_TOP = 'rgb(245,166,120)'
+// The shipped brand ramp (banner.ts LOGO_BRAND) — the default look that unset
+// AND explicit "whale" must both keep.
+const BRAND_TOP = 'rgb(150,180,255)'
 
 describe('logo palette table (StartupScreen.palettes.ts parity)', () => {
-  it('carries the four openclaude palettes with six gradient stops each', () => {
-    expect(LOGO_PALETTE_NAMES).toEqual(['sunset', 'forest', 'ocean', 'monochrome'])
+  it('carries the five palettes with six gradient stops each', () => {
+    expect(LOGO_PALETTE_NAMES).toEqual(['whale', 'sunset', 'forest', 'ocean', 'monochrome'])
 
     for (const name of LOGO_PALETTE_NAMES) {
       expect(LOGO_PALETTES[name].gradient).toHaveLength(6)
     }
 
-    expect(DEFAULT_LOGO_PALETTE).toBe('sunset')
-    expect(LOGO_PALETTE_LABELS.sunset).toBe('Sunset (default)')
+    expect(DEFAULT_LOGO_PALETTE).toBe('whale')
+    expect(LOGO_PALETTE_LABELS.whale).toBe('Whale (default)')
+    expect(LOGO_PALETTE_LABELS.sunset).toBe('Sunset')
     expect(LOGO_PALETTE_LABELS.forest).toBe('Forest green')
     expect(LOGO_PALETTE_LABELS.ocean).toBe('Ocean blue')
     expect(LOGO_PALETTE_LABELS.monochrome).toBe('Monochrome')
   })
 
   it('spot-checks verbatim TS gradient values', () => {
+    expect(LOGO_PALETTES.whale.gradient[2]).toEqual([77, 107, 254])
     expect(LOGO_PALETTES.sunset.gradient[0]).toEqual([255, 180, 100])
     expect(LOGO_PALETTES.forest.gradient[5]).toEqual([25, 80, 45])
     expect(LOGO_PALETTES.ocean.gradient[2]).toEqual([80, 150, 220])
@@ -72,13 +74,13 @@ describe('gradientStopForRow', () => {
 })
 
 describe('banner painting with /logo palettes', () => {
-  it('keeps the shipped brand ramp for unset and explicit sunset', () => {
+  it('keeps the shipped brand ramp for unset and explicit whale', () => {
     expect(wordmarkGradient(undefined)[0]).toBe(BRAND_TOP)
     expect(wordmarkGradient('')[0]).toBe(BRAND_TOP)
-    expect(wordmarkGradient('sunset')[0]).toBe(BRAND_TOP)
+    expect(wordmarkGradient('whale')[0]).toBe(BRAND_TOP)
     expect(wordmarkGradient('not-a-palette')[0]).toBe(BRAND_TOP)
 
-    const rows = logo(C, undefined, 'sunset')
+    const rows = logo(C, undefined, 'whale')
     expect(rows[0]![0]).toBe(BRAND_TOP)
   })
 
@@ -88,12 +90,15 @@ describe('banner painting with /logo palettes', () => {
     rows.forEach((row, i) => expect(row[0]).toBe(rgbStr(LOGO_PALETTES.ocean.gradient[i]!)))
   })
 
-  it('paints lobster rows from a non-default palette, keeps theme colors otherwise', () => {
-    const themed = lobster(C, undefined, undefined)
-    const sunset = lobster(C, undefined, 'sunset')
-    expect(sunset).toEqual(themed)
+  it('paints whale rows from the active palette (default: whale blues)', () => {
+    const themed = whale(C, undefined, undefined)
+    const explicit = whale(C, undefined, 'whale')
+    expect(explicit).toEqual(themed)
+    themed.forEach((row, i) =>
+      expect(row[0]).toBe(rgbStr(gradientStopForRow(LOGO_PALETTES.whale.gradient, i, 6)))
+    )
 
-    const forest = lobster(C, undefined, 'forest')
+    const forest = whale(C, undefined, 'forest')
     expect(forest).toHaveLength(6)
     forest.forEach((row, i) =>
       expect(row[0]).toBe(rgbStr(gradientStopForRow(LOGO_PALETTES.forest.gradient, i, 6)))
@@ -104,7 +109,7 @@ describe('banner painting with /logo palettes', () => {
     const rows = logo(C, '[#ff0000]X[/]', 'ocean')
     expect(rows).toEqual([['#ff0000', 'X']])
 
-    const hero = lobster(C, '[#00ff00]Y[/]', 'ocean')
+    const hero = whale(C, '[#00ff00]Y[/]', 'ocean')
     expect(hero).toEqual([['#00ff00', 'Y']])
   })
 })

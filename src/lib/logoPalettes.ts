@@ -29,6 +29,20 @@ export interface LogoPalette {
 }
 
 export const LOGO_PALETTES = {
+  whale: {
+    gradient: [
+      [150, 180, 255],
+      [110, 145, 255],
+      [77, 107, 254],
+      [56, 82, 215],
+      [40, 60, 170],
+      [28, 42, 120]
+    ],
+    accent: [110, 150, 255],
+    cream: [190, 205, 240],
+    dim: [95, 110, 150],
+    border: [70, 85, 120]
+  },
   sunset: {
     gradient: [
       [255, 180, 100],
@@ -91,10 +105,11 @@ export type LogoPaletteName = keyof typeof LOGO_PALETTES
 
 export const LOGO_PALETTE_NAMES = Object.keys(LOGO_PALETTES) as LogoPaletteName[]
 
-export const DEFAULT_LOGO_PALETTE: LogoPaletteName = 'sunset'
+export const DEFAULT_LOGO_PALETTE: LogoPaletteName = 'whale'
 
 export const LOGO_PALETTE_LABELS: Record<LogoPaletteName, string> = {
-  sunset: 'Sunset (default)',
+  whale: 'Whale (default)',
+  sunset: 'Sunset',
   forest: 'Forest green',
   ocean: 'Ocean blue',
   monochrome: 'Monochrome'

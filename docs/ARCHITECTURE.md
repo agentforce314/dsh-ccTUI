@@ -4,8 +4,8 @@
 ┌────────────────────────────────────────────────────────────────────┐
 │ dsh (cordis runtime, profile "cc")                                 │
 │  @deepseek-ai/dsh-base layer                                       │
-│  + dsh-cc-tui cordis.patch.yml layer                               │
-│    └─ plugin row: dsh-cc-tui                                       │
+│  + dsh-cctui cordis.patch.yml layer                               │
+│    └─ plugin row: dsh-cctui                                       │
 │        src/harness/index.ts   name/inject/Config/apply             │
 │        src/harness/plugin.ts  TTY guard · agent resolve · mount    │
 │        src/harness/client.ts  HarnessGatewayClient  ◄── the seam   │
@@ -74,7 +74,7 @@ unchanged, and terminal/search/read views into `result_text` for the tool trail.
 | `complete.path` | workspace fs walk (TUI-local) |
 | `model.options` | `ctx.llm` advisory catalog + `ctx.agentDefaultModel.currentSelection()` |
 | `set_model` (via dispatch) | `installModelSelection(agent.ctx, ref)`; persist via `ctx.agentDefaultModel` |
-| `config.get` / `config.set` | `ctx.settings` namespace `dsh-cc-tui` (display prefs also mirrored in `~/.dsh-cc-tui/`) |
+| `config.get` / `config.set` | `ctx.settings` namespace `dsh-cctui` (display prefs also mirrored in `~/.dsh-cctui/`) |
 | `shell.exec` (`!cmd`) | TUI-local `child_process` (same as original — it never went to the backend) |
 | `setup.status` | always `{ok}` (harness profile is the setup) |
 | everything else | `Promise.resolve({})` until a stage implements it |
@@ -84,7 +84,7 @@ unchanged, and terminal/search/read views into `result_text` for the tool trail.
 - **In-process**: no gateway subprocess, no stderr ring from a child (the log ring now carries
   harness diagnostics); `gateway.start_timeout`/crash-recovery paths become loader errors.
 - **Sessions are harness sessions**: JSONL persistence, projections, and resume come from the
-  harness; the TUI's own `~/.clawcodex` config/history files move to `~/.dsh-cc-tui/`.
+  harness; the TUI's own `~/.clawcodex` config/history files move to `~/.dsh-cctui/`.
 - **Permission model**: harness approvals are per-request `ask`/`never` + presets; the clawcodex
   mode names are preserved in the UI and mapped (see Stage 5).
 - **Cost**: the harness meters tokens, not dollars; the cost segment renders token counts.
@@ -92,11 +92,11 @@ unchanged, and terminal/search/read views into `result_text` for the tool trail.
 ## Package layout (target)
 
 ```
-dsh-cc-tui/
+dsh-cctui/
 ├── package.json            # "dsh": {"bundle": {"patch": "./cordis.patch.yml"}}, peerDeps @deepseek-ai/*
 ├── cordis.patch.yml        # real install path: config overrides + inserts over dsh-base
 ├── cordis.yml              # dev: full composition incl. scripted-LLM for e2e
-├── bin/dsh-cc-tui.js       # launcher: profile bootstrap + skew guard (Stage 9)
+├── bin/dsh-cctui.js       # launcher: profile bootstrap + skew guard (Stage 9)
 ├── packages/clawcodex-ink/ # vendored fork, unchanged (file: dependency)
 ├── src/
 │   ├── harness/            # ONLY dir importing @deepseek-ai/* (adapter boundary)

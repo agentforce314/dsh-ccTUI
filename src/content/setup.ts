@@ -4,7 +4,7 @@ export const SETUP_REQUIRED_TITLE = 'Setup Required'
 
 export const buildSetupRequiredSections = (): PanelSection[] => [
   {
-    text: 'clawcodex needs a model provider before the TUI can start a session.'
+    text: 'dsh-ccTUI needs a model provider before the TUI can start a session.'
   },
   {
     rows: [

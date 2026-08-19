@@ -4,7 +4,7 @@ import { applyColor, Box, stringWidth, Text, useStdout } from '@clawcodex/ink'
 import { useEffect, useState } from 'react'
 import unicodeSpinners from 'unicode-animations'
 
-import { artWidth, lobster, LOBSTER_WIDTH, logo, LOGO_WIDTH } from '../banner.js'
+import { artWidth, logo, LOGO_WIDTH, whale, WHALE_WIDTH } from '../banner.js'
 import { levelForMode } from '../lib/permissionLevels.js'
 import { flat } from '../lib/text.js'
 import { getWorktreeSession } from '../lib/worktree.js'
@@ -48,9 +48,9 @@ export function ArtLines({ lines }: { lines: [string, string][] }) {
 // Terminals can't scale glyphs, so "responsive" means picking a layout that
 // fits the available columns. Thresholds are picked so each tier reads
 // comfortably without forcing wrap or truncation drift on box-drawing edges.
-const TAG_FULL = 'a coding agent in your terminal'
-const TAG_MID = 'terminal coding agent'
-const TAG_TINY = 'clawcodex'
+const TAG_FULL = 'Claude Code style TUI for Deepseek-Harness'
+const TAG_MID = 'Claude Code style TUI'
+const TAG_TINY = 'dsh-ccTUI'
 const HIDE_BELOW = 34
 const COMPACT_FROM = 58
 
@@ -357,8 +357,8 @@ const TOOLSETS_MAX = 8
 export function SessionPanel({ info, logoPalette, maxWidth, sid, t }: SessionPanelProps) {
   const term = useStdout().stdout?.columns ?? 100
   const cols = Math.max(20, Math.min(term, maxWidth ?? term))
-  const heroLines = lobster(t.color, t.bannerHero || undefined, logoPalette)
-  const heroW = artWidth(heroLines) || LOBSTER_WIDTH
+  const heroLines = whale(t.color, t.bannerHero || undefined, logoPalette)
+  const heroW = artWidth(heroLines) || WHALE_WIDTH
 
   // Left-column lines, built before layout so the column can be sized to them.
   // The cwd is pre-truncated to the column's hard cap: sizing the column to an
@@ -768,7 +768,7 @@ export function SessionPanel({ info, logoPalette, maxWidth, sid, t }: SessionPan
               - run{' '}
             </Text>
             <Text bold color={t.color.warn}>
-              {info.update_command || 'clawcodex update'}
+              {info.update_command || 'git pull && ./install.sh'}
             </Text>
             <Text bold={false} color={t.color.warn} dimColor>
               {' '}

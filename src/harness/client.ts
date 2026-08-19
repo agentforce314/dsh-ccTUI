@@ -7,6 +7,7 @@
 // Boundary rule: src/harness/ is the ONLY directory allowed to import
 // @deepseek-ai/* (see docs/ARCHITECTURE.md).
 import { randomUUID } from 'node:crypto'
+import { createRequire } from 'node:module'
 
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection, type Agent, type AgentHandle, type ModelSelection, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
@@ -22,6 +23,26 @@ import { structuredPatch } from 'diff'
 
 import type { GatewayTranscriptMessage, StructuredDiffPayload } from '../gatewayTypes.js'
 import type { SessionInfo, Usage } from '../types.js'
+
+const PLUGIN_VERSION = (() => {
+  const require = createRequire(import.meta.url)
+
+  // '../package.json' from the built dist/plugin.js; '../../package.json'
+  // when running from src (tsx, vitest).
+  for (const rel of ['../package.json', '../../package.json']) {
+    try {
+      const pkg = require(rel) as { name?: string; version?: string }
+
+      if (pkg.name === 'dsh-cctui' && pkg.version) {
+        return pkg.version
+      }
+    } catch {
+      // try the next candidate
+    }
+  }
+
+  return ''
+})()
 
 export interface HarnessClientOptions {
   cwd?: string
@@ -150,7 +171,7 @@ export class HarnessGatewayClient extends GatewayClient {
 
   private async createAgent(fixedSessionId?: string): Promise<AgentHandle> {
     const route = this.resolveRoute()
-    const sessionId = SessionId(fixedSessionId ?? `cc-tui-${randomUUID()}`)
+    const sessionId = SessionId(fixedSessionId ?? `cctui-${randomUUID()}`)
 
     this.selection = { assembled: undefined, current: route }
 
@@ -295,7 +316,7 @@ export class HarnessGatewayClient extends GatewayClient {
       reasoning_effort: route?.reasoningEffort,
       skills: {},
       tools: toolNames.length ? { harness: toolNames } : {},
-      version: 'dsh'
+      version: PLUGIN_VERSION || 'dsh'
     }
   }
 

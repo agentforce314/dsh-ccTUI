@@ -9,10 +9,10 @@ import type { Config } from './index.js'
 import { HarnessGatewayClient } from './client.js'
 
 export async function mountCcTui(ctx: Context, config: Config): Promise<void> {
-  const allowNoTty = config.allowNoTty || process.env.DSH_CC_TUI_ALLOW_NO_TTY === '1'
+  const allowNoTty = config.allowNoTty || process.env.DSH_CCTUI_ALLOW_NO_TTY === '1'
 
   if (!allowNoTty && (!process.stdin.isTTY || !process.stdout.isTTY)) {
-    throw new Error('dsh-cc-tui requires an interactive terminal (set allowNoTty for headless tests)')
+    throw new Error('dsh-cctui requires an interactive terminal (set allowNoTty for headless tests)')
   }
 
   // The dev react-reconciler records unbounded performance marks; production
@@ -68,20 +68,20 @@ export async function mountCcTui(ctx: Context, config: Config): Promise<void> {
     onError: (scope, err) => {
       const message = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
 
-      process.stderr.write(`dsh-cc-tui lifecycle ${scope}: ${message.slice(0, 2000)}\n`)
+      process.stderr.write(`dsh-cctui lifecycle ${scope}: ${message.slice(0, 2000)}\n`)
     },
     onSignal: signal => {
       if (!allowNoTty) {
         resetTerminalModes(process.stdout, FULLSCREEN)
       }
 
-      process.stderr.write(`dsh-cc-tui lifecycle: received ${signal}\n`)
+      process.stderr.write(`dsh-cctui lifecycle: received ${signal}\n`)
     }
   })
 
   const stopMemoryMonitor = startMemoryMonitor({
     onCritical: () => {
-      process.stderr.write('dsh-cc-tui: exiting to avoid OOM; restart to recover\n')
+      process.stderr.write('dsh-cctui: exiting to avoid OOM; restart to recover\n')
       process.exit(137)
     },
     onHigh: () => {},

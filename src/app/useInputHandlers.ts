@@ -628,7 +628,7 @@ export function useInputHandlers(ctx: InputHandlerContext): InputHandlerResult {
       // or the whole app. Point at the real bindings instead. Dashboard chat
       // gates /exit (core.ts DASHBOARD_EXIT_DISABLED_MESSAGE), so hint /new
       // there.
-      const exitHint = DASHBOARD_TUI_MODE ? '/new to start a fresh chat' : '/exit to quit clawcodex'
+      const exitHint = DASHBOARD_TUI_MODE ? '/new to start a fresh chat' : '/exit to quit dsh-ccTUI'
 
       return actions.sys(live.busy ? `esc to interrupt · ${exitHint}` : exitHint)
     }

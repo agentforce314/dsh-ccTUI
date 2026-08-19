@@ -423,7 +423,7 @@ class TurnController {
     // turn was cancelled, even when only prior `segments` were preserved.
     // CC parity string (InterruptedByUser.tsx): a dim one-liner that invites
     // the redirect instead of a bare "[interrupted]" tag.
-    const interruptNote = 'Interrupted · What should clawcodex do instead?'
+    const interruptNote = 'Interrupted · What should dsh-ccTUI do instead?'
 
     if (partial || tools.length) {
       appendMessage({

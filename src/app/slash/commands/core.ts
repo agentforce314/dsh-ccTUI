@@ -119,7 +119,7 @@ export const coreCommands: SlashCommand[] = [
 
   {
     aliases: ['exit'],
-    help: 'exit clawcodex',
+    help: 'exit dsh-ccTUI',
     name: 'quit',
     run: (_arg, ctx) => {
       // In the hosted dashboard chat there is no in-page restart path after
@@ -142,7 +142,7 @@ export const coreCommands: SlashCommand[] = [
   },
 
   {
-    help: 'update clawcodex to the latest version (exits TUI)',
+    help: 'update dsh-ccTUI to the latest version (exits TUI)',
     name: 'update',
     run: (_arg, ctx) => {
       if (DASHBOARD_TUI_MODE) {

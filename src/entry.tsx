@@ -17,7 +17,7 @@ import { resetTerminalModes } from './lib/terminalModes.js'
 import { registerWorktreeNoteOnExit } from './lib/worktree.js'
 
 if (!process.stdin.isTTY) {
-  console.log('clawcodex-tui: no TTY')
+  console.log('dsh-ccTUI: no TTY')
   process.exit(0)
 }
 
@@ -123,7 +123,7 @@ const stopMemoryMonitor = startMemoryMonitor({
       `clawcodex-tui lifecycle: memory critical exit heap=${formatBytes(snap.heapUsed)} rss=${formatBytes(snap.rss)}\n`
     )
     process.stderr.write(dumpNotice(snap, dump))
-    process.stderr.write('clawcodex-tui: exiting to avoid OOM; restart to recover\n')
+    process.stderr.write('dsh-ccTUI: exiting to avoid OOM; restart to recover\n')
     process.exit(137)
   },
   onHigh: (snap, dump) => process.stderr.write(dumpNotice(snap, dump)),
