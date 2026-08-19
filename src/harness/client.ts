@@ -24,9 +24,10 @@ import type {} from '@deepseek-ai/dsh-plan-mode'
 import type {} from '@deepseek-ai/dsh-subagent'
 
 import { toolArgsPreview } from '../domain/toolArgs.js'
+import { isDelegationCall } from '../domain/toolBrief.js'
 import { GatewayClient, SLASHES } from '../gatewayClient.js'
 import { appHome } from '../lib/appHome.js'
-import { compactPreview } from '../lib/text.js'
+import { compactPreview, fmtK, toolTrailLabel } from '../lib/text.js'
 import { structuredPatch } from 'diff'
 
 import type { GatewayEvent, GatewayTranscriptMessage, StructuredDiffPayload } from '../gatewayTypes.js'
@@ -315,6 +316,10 @@ export class HarnessGatewayClient extends GatewayClient {
   /** Live subagents, keyed by the child's own session id. */
   private children = new Map<string, ChildRun>()
   private childCount = 0
+  /** Settled children not yet claimed by a delegating call's result row. */
+  private settledChildren: ChildRun[] = []
+  /** Tool-call ids of delegations still waiting for their result. */
+  private inFlightDelegations = new Set<string>()
   private pendingTodos: unknown[] | null = null
   private generatingAnnounced = new Set<string>()
   private gateApproval: { resolve: (o: ApprovalOutcome) => void } | null = null
@@ -610,6 +615,7 @@ export class HarnessGatewayClient extends GatewayClient {
     }
 
     this.children.delete(id)
+    this.settledChildren.push(child)
     this.publishChild('subagent.complete', id, child, {
       duration_seconds: Math.max(0, Date.now() - child.startedAt) / 1000,
       input_tokens: child.inputTokens,
@@ -617,6 +623,57 @@ export class HarnessGatewayClient extends GatewayClient {
       status: stopReason === 'completed' ? 'completed' : stopReason === 'interrupted' ? 'interrupted' : 'failed',
       summary: compactPreview(textOf(output, ['text']), 200)
     })
+  }
+
+  /**
+   * A delegation's own ⎿ row.
+   *
+   * The tool answers with the child's whole reply, which is addressed to the
+   * MODEL — the parent reads it and writes its own answer, and pasting it into
+   * the row buries the turn under work the reader did not ask to see. The
+   * original states the delegation instead: `Backgrounded agent` when the child
+   * is still going, `Done (2 tool uses · 48.0k tokens · 11s)` when it is not.
+   *
+   * The counts come from the child's own log, and only when the join is
+   * unambiguous: exactly one delegation in flight and exactly one child settled
+   * under it. Parallel delegations are explicitly encouraged by the harness's
+   * prompt, and attributing one child's tokens to another's row is worse than
+   * reporting only the time this call took — which is always this call's own.
+   */
+  private delegationView(
+    callId: string,
+    view: { failed?: boolean; resultRaw?: string; resultText: string; structuredDiff?: StructuredDiffPayload },
+    durationS?: number
+  ): typeof view {
+    if (!this.inFlightDelegations.delete(callId) || view.failed) {
+      return view
+    }
+
+    const claimed = this.inFlightDelegations.size === 0 && this.settledChildren.length === 1 ? this.settledChildren[0] : undefined
+
+    this.settledChildren = []
+
+    const took = durationS === undefined ? '' : `${Math.max(1, Math.round(durationS))}s`
+
+    // A background delegation has not produced any of that yet: it returns a
+    // durable id and keeps running.
+    if (!claimed) {
+      const backgrounded = /^started (?:background )?subagent/.test(view.resultText.trim())
+
+      return {
+        ...view,
+        resultRaw: view.resultRaw ?? view.resultText,
+        resultText: backgrounded ? 'Backgrounded agent' : took ? `Done (${took})` : 'Done'
+      }
+    }
+
+    const parts = [
+      `${claimed.toolCount} tool ${claimed.toolCount === 1 ? 'use' : 'uses'}`,
+      `${fmtK(claimed.inputTokens + claimed.outputTokens)} tokens`,
+      took
+    ].filter(Boolean)
+
+    return { ...view, resultRaw: view.resultRaw ?? view.resultText, resultText: `Done (${parts.join(' · ')})` }
   }
 
   private onChildSessionEvent(id: string, event: SessionEvent): void {
@@ -721,6 +778,12 @@ export class HarnessGatewayClient extends GatewayClient {
         this.callStarted.set(id, Date.now())
         this.callArgs.set(id, prettyArgs(rawArgs))
         this.callRawArgs.set(id, rawArgs)
+
+        if (isDelegationCall(toolTrailLabel(name))) {
+          this.inFlightDelegations.add(id)
+          // Only children that start from HERE on can belong to this call.
+          this.settledChildren = []
+        }
         this.publishLocalEvent({
           // `context` is the `⏺ Tool(args)` row's parenthesized half; the
           // fuller `args_text` only surfaces behind ctrl+o. Without a context
@@ -740,7 +803,7 @@ export class HarnessGatewayClient extends GatewayClient {
         const id = String(block.toolCallId)
         const startedAt = this.callStarted.get(id)
         const durationS = startedAt === undefined ? undefined : Math.max(0, Date.now() - startedAt) / 1000
-        const view = this.presentResult(id, block.content, Boolean(block.isError), meta, durationS)
+        const view = this.delegationView(id, this.presentResult(id, block.content, Boolean(block.isError), meta, durationS), durationS)
         const todos = this.pendingTodos
 
         this.pendingTodos = null

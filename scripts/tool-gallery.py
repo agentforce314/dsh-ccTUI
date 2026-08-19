@@ -77,6 +77,10 @@ SCENARIOS: dict[str, object] = {
         ' {\\"command\\": \\"sleep 4 && ls -1 src | head -3\\", \\"description\\": \\"peek at src\\"}",'
         ' "run_in_background": false}'
     ),
+    # the harness's default: the call returns a durable id and the child runs on
+    "subagent_background": (
+        'PROBE subagent {"description": "Audit the tests", "prompt": "Summarise the test layout and stop."}'
+    ),
     "skill": 'PROBE skill {"name": "nonexistent-skill"}',
     "job_list": 'PROBE job_list {}',
     "list_agents": 'PROBE list_agents {}',
