@@ -66,6 +66,13 @@ SCENARIOS: dict[str, object] = {
     # reaches the network on purpose — the fetch card is a retrieval summary
     "web_fetch": 'PROBE web_fetch {"url": "https://example.com"}',
     "web_search": 'PROBE web_search {"query": "deepseek harness"}',
+    "subagent": (
+        'PROBE subagent {"description": "Review the diff", "prompt": "Summarise what changed in src/ and stop.",'
+        ' "run_in_background": false}'
+    ),
+    "skill": 'PROBE skill {"name": "nonexistent-skill"}',
+    "job_list": 'PROBE job_list {}',
+    "list_agents": 'PROBE list_agents {}',
     "todo": (
         'PROBE todo_write {"todos": [{"content": "first task", "status": "in_progress"},'
         ' {"content": "second task", "status": "pending"}]}'

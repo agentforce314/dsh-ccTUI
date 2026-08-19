@@ -28,9 +28,9 @@
 
 /**
  * Arguments that never identify a call. Bulk payloads (a file body, an edit's
- * before/after, a checklist) and policy/qualifier fields (why a command may
- * escalate, which window of a file to read) both make the row longer and less
- * distinguishable, which is the opposite of the point.
+ * before/after, a checklist, a delegation's brief) and policy/qualifier fields
+ * (why a command may escalate, which window of a file to read) both make the
+ * row longer and less distinguishable, which is the opposite of the point.
  */
 const NOISE_KEYS: ReadonlySet<string> = new Set([
   // bulk payloads
@@ -41,9 +41,9 @@ const NOISE_KEYS: ReadonlySet<string> = new Set([
   'new_string',
   'old_str',
   'old_string',
+  'prompt',
   'todos',
   // policy / qualifiers
-  'description',
   'justification',
   'limit',
   'max_goal_rounds',
@@ -55,6 +55,18 @@ const NOISE_KEYS: ReadonlySet<string> = new Set([
   'view_range',
   'wait'
 ])
+
+/**
+ * A human label the tool was handed for exactly this purpose — but only worth
+ * showing when nothing sharper survived.
+ *
+ * A shell call carries both `command` and `description`, and the command is
+ * what identifies the run: `Bash(ls -1 src)`, not `Bash(list src)`. A
+ * delegation carries `description` and `prompt`, and the prompt is bulk — so
+ * the description is all that is left, and it is precisely what the original
+ * puts in the parens: `Task(Review the diff)`, never the brief itself.
+ */
+const LABEL_KEYS: ReadonlySet<string> = new Set(['description'])
 
 const renderValue = (value: unknown): string => {
   if (typeof value === 'string') {
@@ -99,10 +111,16 @@ export const toolArgsPreview = (raw: string): string => {
   }
 
   const entries = Object.entries(parsed as Record<string, unknown>).filter(([, value]) => value !== undefined)
-  const salient = entries.filter(([key]) => !NOISE_KEYS.has(key))
+  const salient = entries.filter(([key]) => !NOISE_KEYS.has(key) && !LABEL_KEYS.has(key))
+
+  if (salient.length) {
+    return project(salient)
+  }
+
+  const labels = entries.filter(([key]) => LABEL_KEYS.has(key))
 
   // A call whose every argument is bulk (a bare `todo_write`) still deserves a
   // row that says something; falling back to the unfiltered projection beats
   // rendering `⏺ Todo Write()`.
-  return project(salient.length ? salient : entries)
+  return project(labels.length ? labels : entries)
 }
