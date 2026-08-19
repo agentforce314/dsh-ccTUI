@@ -14,7 +14,7 @@ describe('toTranscriptMessages', () => {
   it('preserves assistant tool-call rows so resume does not drop prior turns', () => {
     const rows = [
       { role: 'user', text: 'first prompt' },
-      { role: 'tool', context: 'repo', name: 'search_files', text: 'ignored raw result' },
+      { role: 'tool', context: 'repo', name: 'search_files', text: 'Found 3 files' },
       { role: 'assistant', text: 'first answer' },
       { role: 'user', text: 'second prompt' }
     ]
@@ -25,6 +25,9 @@ describe('toTranscriptMessages', () => {
       ['user', 'second prompt']
     ])
     expect(toTranscriptMessages(rows)[1]?.tools?.[0]).toContain('Search Files')
+    // the row's text is the PRESENTED result the live trail showed, so a
+    // resumed transcript reads the way it did the first time
+    expect(toTranscriptMessages(rows)[1]?.tools?.[0]).toContain('Found 3 files')
   })
 })
 

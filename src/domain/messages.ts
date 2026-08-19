@@ -64,7 +64,10 @@ export const toTranscriptMessages = (rows: unknown): Msg[] => {
     const { context, name, role, text } = row as TranscriptRow
 
     if (role === 'tool') {
-      pending.push(buildToolTrailLine(name ?? 'tool', context ?? ''))
+      // `text` is the PRESENTED result — the same `⎿` summary the live trail
+      // built, not the model-facing payload — so a resumed transcript reads
+      // the way it did the first time.
+      pending.push(buildToolTrailLine(name ?? 'tool', context ?? '', false, typeof text === 'string' ? text : ''))
 
       continue
     }

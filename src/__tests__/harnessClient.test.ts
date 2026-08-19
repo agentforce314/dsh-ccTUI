@@ -74,6 +74,7 @@ function makeWorld() {
   const storedEvents = [
     { data: { content: [{ text: 'old prompt', type: 'text' }], id: 'u1', role: 'user', source: { kind: 'user' } }, seq: 1, time: 1, type: 'user/message' },
     { data: { arguments: '{"command":"ls"}', callId: 'c1', name: 'bash', step: 1, turn: 1 }, seq: 2, time: 2, type: 'tool/call' },
+    { data: { message: { content: [{ content: [{ text: 'raw', type: 'text' }], toolCallId: 'c1', type: 'tool-result' }] }, step: 1, turn: 1 }, seq: 3, time: 3, type: 'tool/result' },
     { data: { message: { content: [{ text: 'old reply', type: 'text' }], id: 'a1', role: 'assistant', source: { kind: 'model' } }, step: 1, turn: 1, usage: { cacheReadTokens: 100, inputTokens: 900, outputTokens: 120 } }, seq: 3, time: 3, type: 'assistant/message' },
     { data: { reason: { kind: 'completed' }, turn: 1 }, seq: 4, time: 4, type: 'turn/end' }
   ]
@@ -958,9 +959,11 @@ describe('HarnessGatewayClient', () => {
     expect((w.ctx.agents.resume as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
     expect(res.session_id).toBe('cc-resumed-1')
     expect(res.running).toBe(false)
+    // the tool row carries its PRESENTED result, so the resumed transcript
+    // reads the way it did the first time — `⎿ ran fine`, not a bare `⏺ Bash(ls)`
     expect(res.messages).toEqual([
       { role: 'user', text: 'old prompt' },
-      { context: 'ls', name: 'bash', role: 'tool' },
+      { context: 'ls', name: 'bash', role: 'tool', text: 'ran fine' },
       { role: 'assistant', text: 'old reply' }
     ])
 

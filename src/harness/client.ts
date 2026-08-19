@@ -123,6 +123,46 @@ const failureText = (message: string, identity?: { code: string; name: string })
   return /^error\b/i.test(body) ? body : `Error: ${body}`
 }
 
+/**
+ * A diff card's header, as plain text, for a transcript row that cannot draw
+ * the card itself — the resumed session's flat trail. Mirrors what DiffView
+ * prints above the patch (`Wrote N lines to path`, `Added N lines, removed M
+ * lines`), so replay says the same thing the live card did rather than the
+ * model-facing "the file has been updated successfully" boilerplate.
+ */
+const diffSummary = (diff: StructuredDiffPayload): string => {
+  if (diff.kind === 'create') {
+    const all = (diff.content ?? '').split('\n')
+
+    if (all.at(-1) === '') {
+      all.pop()
+    }
+
+    return `Wrote ${plural(all.length, 'line')} to ${diff.filePath}`
+  }
+
+  let added = 0
+  let removed = 0
+
+  for (const hunk of diff.hunks) {
+    for (const line of hunk.lines) {
+      if (line.startsWith('+')) {
+        added++
+      } else if (line.startsWith('-')) {
+        removed++
+      }
+    }
+  }
+
+  if (!added && !removed) {
+    return ''
+  }
+
+  const clauses = [added ? `Added ${plural(added, 'line')}` : '', removed ? `${added ? 'r' : 'R'}emoved ${plural(removed, 'line')}` : '']
+
+  return clauses.filter(Boolean).join(', ')
+}
+
 /** `1 file` / `2 files` — the count the ⎿ summary lines are built from. */
 const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`
 
@@ -482,6 +522,9 @@ export class HarnessGatewayClient extends GatewayClient {
   /** Fold a session event log into resume-transcript rows. */
   private rehydrate(events: readonly SessionEvent[]): GatewayTranscriptMessage[] {
     const rows: GatewayTranscriptMessage[] = []
+    // callId → the tool row waiting for its result. Keyed, not last-wins:
+    // parallel calls interleave their results in the log.
+    const calls = new Map<string, { name: string; rawArgs: string; row: number }>()
 
     for (const event of events) {
       switch (event.type) {
@@ -513,9 +556,38 @@ export class HarnessGatewayClient extends GatewayClient {
         }
 
         case 'tool/call': {
-          const { name, arguments: rawArgs } = (event as SessionEvent<'tool/call'>).data
+          const { callId, name, arguments: rawArgs } = (event as SessionEvent<'tool/call'>).data
 
+          calls.set(String(callId), { name, rawArgs, row: rows.length })
           rows.push({ context: toolArgsPreview(rawArgs), name, role: 'tool' })
+          break
+        }
+
+        case 'tool/result': {
+          // Replay's whole point is that the transcript reads the same coming
+          // back as it did going out. Without this the resumed session showed
+          // `⏺ Read(src/a.ts)` and nothing under it — every result the session
+          // had ever produced, gone.
+          const { message, error, meta } = (event as SessionEvent<'tool/result'>).data
+          const block = message.content[0]
+          const call = calls.get(String(block.toolCallId))
+
+          if (!call) {
+            break
+          }
+
+          calls.delete(String(block.toolCallId))
+
+          const view = this.presentResult(call.name, call.rawArgs, block.content, Boolean(block.isError), meta)
+          const row = rows[call.row]
+
+          if (row) {
+            row.text =
+              error || block.isError || view.failed
+                ? failureText(view.resultText, error)
+                : (view.structuredDiff && diffSummary(view.structuredDiff)) || view.resultText
+          }
+
           break
         }
 
@@ -857,7 +929,18 @@ export class HarnessGatewayClient extends GatewayClient {
         const id = String(block.toolCallId)
         const startedAt = this.callStarted.get(id)
         const durationS = startedAt === undefined ? undefined : Math.max(0, Date.now() - startedAt) / 1000
-        const view = this.delegationView(id, this.presentResult(id, block.content, Boolean(block.isError), meta, durationS), durationS)
+        const presented = this.presentResult(
+          this.callNames.get(id),
+          this.callRawArgs.get(id),
+          block.content,
+          Boolean(block.isError),
+          meta,
+          durationS
+        )
+
+        this.callRawArgs.delete(id)
+
+        const view = this.delegationView(id, presented, durationS)
         const todos = this.pendingTodos
 
         this.pendingTodos = null
@@ -1096,19 +1179,24 @@ export class HarnessGatewayClient extends GatewayClient {
   }
 
 
-  /** Refine a tool result through the tool's own presentation view. */
+  /**
+   * Refine a tool result through the tool's own presentation view.
+   *
+   * The call's name and arguments come in rather than off the live maps, so
+   * REPLAY can use this too: the harness projects every card's structured
+   * shape through `output.presentationMeta`, which is persisted with the
+   * session log precisely so `presentResult` reproduces the identical card
+   * from a stored event.
+   */
   private presentResult(
-    callId: string,
+    name: string | undefined,
+    rawArgs: string | undefined,
     content: readonly ContentBlock[],
     isError: boolean,
     meta: unknown,
     durationS?: number
   ): { failed?: boolean; resultRaw?: string; resultText: string; structuredDiff?: StructuredDiffPayload } {
     const fallback = textOf(content, ['text'])
-    const name = this.callNames.get(callId)
-    const rawArgs = this.callRawArgs.get(callId)
-
-    this.callRawArgs.delete(callId)
 
     if (!name) {
       return { resultText: fallback }
