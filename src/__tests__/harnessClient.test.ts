@@ -564,6 +564,46 @@ describe('HarnessGatewayClient', () => {
       })
     })
 
+    it('bills the child\'s tokens to the session odometer, not just its own row', async () => {
+      const w = await delegating()
+
+      // The parent's own step…
+      w.fire('assistant/message', {
+        message: { content: [{ text: 'delegating', type: 'text' }], id: 'p1', role: 'assistant', source: { kind: 'model' } },
+        step: 1,
+        turn: 1,
+        usage: { inputTokens: 100, outputTokens: 10 }
+      })
+      // …and the child's, which used far more than the parent did. Both are
+      // the same bill; only the child's row used to hear about the second.
+      w.fireFrom(CHILD, 'assistant/message', {
+        message: { content: [{ text: 'done', type: 'text' }], id: 'm1', role: 'assistant', source: { kind: 'model' } },
+        step: 1,
+        turn: 1,
+        usage: { cacheReadTokens: 400, inputTokens: 500, outputTokens: 60 }
+      })
+
+      await expect(w.client.request('session.usage', {})).resolves.toMatchObject({
+        calls: 2,
+        input: 1000,
+        output: 70,
+        total: 1070
+      })
+    })
+
+    it('ignores a sibling session that was never announced as a child', async () => {
+      const w = await delegating()
+
+      w.fireFrom('some-other-session', 'assistant/message', {
+        message: { content: [{ text: 'not ours', type: 'text' }], id: 'x1', role: 'assistant', source: { kind: 'model' } },
+        step: 1,
+        turn: 1,
+        usage: { inputTokens: 999, outputTokens: 999 }
+      })
+
+      await expect(w.client.request('session.usage', {})).resolves.toMatchObject({ calls: 0, input: 0, output: 0 })
+    })
+
     const delegate = async (
       w: ReturnType<typeof makeWorld>,
       { callId = 'd1', resultText = 'the child answer' }: { callId?: string; resultText?: string } = {}

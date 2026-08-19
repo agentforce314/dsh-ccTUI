@@ -2,8 +2,10 @@
  * Session-stats line under the composer — the deleted REPL's bottom toolbar:
  * `provider · model · cwd · turns: N · tokens: X in / Y out · cost $C`.
  *
- * Covers the CostSnapshot fold, the width-aware line builder, the
- * message.complete → ui.sessionStats patch, and the component render gate.
+ * Covers both folds — the priced CostSnapshot and the price-free `usage`
+ * odometer a backend like the dsh harness sends instead — plus their
+ * precedence, the width-aware line builder, the message.complete →
+ * ui.sessionStats patch, and the component render gate.
  */
 import { PassThrough } from 'node:stream'
 
@@ -18,7 +20,7 @@ import { resetTurnState } from '../app/turnStore.js'
 import { getUiState, patchUiState, resetUiState } from '../app/uiStore.js'
 import { SessionStatsLine } from '../components/sessionStatsLine.js'
 import type { CostSnapshot } from '../gatewayTypes.js'
-import { buildSessionStatsLine, statsFromCostSnapshot, ZERO_SESSION_STATS } from '../lib/sessionStats.js'
+import { buildSessionStatsLine, statsFromCostSnapshot, statsFromUsage, ZERO_SESSION_STATS } from '../lib/sessionStats.js'
 import { stripAnsi } from '../lib/text.js'
 import type { Msg } from '../types.js'
 
@@ -48,6 +50,23 @@ describe('statsFromCostSnapshot', () => {
 
   it('degrades an empty snapshot to zeros', () => {
     expect(statsFromCostSnapshot({}, 1)).toEqual({ ...ZERO_SESSION_STATS, turns: 1 })
+  })
+})
+
+describe('statsFromUsage', () => {
+  it('reads the cumulative odometer a price-free backend sends instead', () => {
+    // The harness folds cache reads/writes into `input` before it ships them,
+    // which is already what inputTokens means.
+    expect(statsFromUsage({ calls: 4, input: 33189, output: 622, total: 33811 }, 3)).toEqual({
+      costUsd: 0,
+      inputTokens: 33189,
+      outputTokens: 622,
+      turns: 3
+    })
+  })
+
+  it('reports spend only when the backend priced it', () => {
+    expect(statsFromUsage({ calls: 1, cost_usd: 0.0048, input: 10, output: 2, total: 12 }, 1).costUsd).toBe(0.0048)
   })
 })
 
@@ -174,6 +193,43 @@ describe('message.complete → ui.sessionStats', () => {
       outputTokens: 622,
       turns: 2
     })
+  })
+
+  it('folds a price-free backend\'s usage odometer when there is no snapshot', () => {
+    const onEvent = createGatewayEventHandler(buildCtx())
+
+    // The dsh harness has no price table, so it publishes token totals here
+    // and never a CostSnapshot. This read `tokens: 0 in / 0 out` all session.
+    onEvent({
+      payload: { session_turns: 1, text: 'done', usage: { calls: 2, input: 33189, output: 622, total: 33811 } },
+      type: 'message.complete'
+    } as any)
+
+    expect(getUiState().sessionStats).toEqual({ costUsd: 0, inputTokens: 33189, outputTokens: 622, turns: 1 })
+  })
+
+  it('prefers the snapshot over usage when a backend sends both', () => {
+    const onEvent = createGatewayEventHandler(buildCtx())
+
+    // On a snapshot-carrying backend `usage` describes the last call, not the
+    // session — the subagent-inclusive snapshot is the one to believe.
+    onEvent({
+      payload: { cost: SNAPSHOT, session_turns: 1, usage: { calls: 1, input: 12, output: 3, total: 15 } },
+      type: 'message.complete'
+    } as any)
+
+    expect(getUiState().sessionStats).toMatchObject({ inputTokens: 33189, outputTokens: 622 })
+  })
+
+  it('folds the usage rider a resume replays out of the session log', () => {
+    const onEvent = createGatewayEventHandler(buildCtx())
+
+    onEvent({
+      payload: { session_turns: 1, usage: { calls: 1, input: 1000, output: 120, total: 1120 } },
+      type: 'session.stats'
+    } as any)
+
+    expect(getUiState().sessionStats).toEqual({ costUsd: 0, inputTokens: 1000, outputTokens: 120, turns: 1 })
   })
 
   it('leaves sessionStats untouched when the payload carries neither field', () => {

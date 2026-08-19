@@ -455,6 +455,10 @@ export class HarnessGatewayClient extends GatewayClient {
    * `assistant/message` carries the `usage` the adapter reported — so a
    * resumed session has no reason to restart its counters at zero while
    * `turns:` keeps counting; that mismatch was visible on the stats line.
+   *
+   * Only this session's own steps: a subagent's live in the child's log, and
+   * this session never held those events. Live delegations still fold in
+   * through `onChildSessionEvent`.
    */
   private replayUsage(events: readonly SessionEvent[]): Usage {
     const totals: Usage = { calls: 0, input: 0, output: 0, total: 0 }
@@ -753,6 +757,14 @@ export class HarnessGatewayClient extends GatewayClient {
         if (usage) {
           child.inputTokens += usage.inputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
           child.outputTokens += usage.outputTokens
+          // …and onto the session odometer, because a delegated step is spend
+          // on this session's behalf: it is the same bill, and the stats line
+          // and /status have always claimed to count subagents. Only the
+          // child's own row counted it before, so a run that fanned out
+          // reported a fraction of what it actually used. The two sides of
+          // the bus are disjoint (bindAgent routes by session identity), so
+          // nothing is counted twice.
+          foldUsage(this.usageTotals, usage)
         }
 
         // One event per step rather than one per delta: a child's reasoning
