@@ -1092,7 +1092,13 @@ export class HarnessGatewayClient extends GatewayClient {
         const structuredDiff: StructuredDiffPayload = {
           filePath: first.path,
           hunks: patch.hunks.map(h => ({
-            lines: h.lines,
+            // `\ No newline at end of file` is an artifact of diffing the
+            // tool's applied HUNK rather than the whole file: a fragment that
+            // stops mid-file has no trailing newline by construction, and the
+            // file it came from is usually fine. The row renderer has no marker
+            // for it either, so it came out as a phantom context line numbered
+            // one past the end. Upstream shows no such row.
+            lines: h.lines.filter(line => !line.startsWith('\\')),
             newLines: h.newLines,
             newStart: h.newStart,
             oldLines: h.oldLines,
