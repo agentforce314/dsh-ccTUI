@@ -62,7 +62,18 @@ function makeWorld() {
                 }
               : toolName === 'bash'
                 ? { presentResult: () => ({ card: 'terminal', exitCode: 0, output: 'ran fine' }) }
-                : undefined,
+                : toolName === 'failing_bash'
+                  ? { presentResult: () => ({ card: 'terminal', exitCode: 1, output: 'ls: nope: No such file or directory\n' }) }
+                  : toolName === 'killed_bash'
+                    ? { presentResult: () => ({ card: 'terminal', output: 'partial', signal: 'SIGTERM' }) }
+                    : toolName === 'fenced'
+                      ? {
+                          presentResult: () => ({
+                            card: 'generic',
+                            content: [{ text: '```console\nboom\n```', type: 'text' }]
+                          })
+                        }
+                      : undefined,
           schemas: () => [{ name: 'bash' }, { name: 'read' }]
         }
       }
@@ -253,7 +264,7 @@ describe('HarnessGatewayClient', () => {
     expect(start.payload.context).toBe('notes.txt')
   })
 
-  it('marks failed tool results with an error', async () => {
+  it('renders the tool’s own message on a failed call, not its error code', async () => {
     const w = makeWorld()
 
     w.client.start()
@@ -261,9 +272,114 @@ describe('HarnessGatewayClient', () => {
     w.events.length = 0
 
     w.fire('turn/start', { turn: 1 })
-    w.fire('tool/call', { arguments: '{}', callId: 'c9', name: 'bash', step: 1, turn: 1 })
+    w.fire('tool/call', { arguments: '{"file_path":"gone.ts"}', callId: 'r1', name: 'read', step: 1, turn: 1 })
     w.fire('tool/result', {
-      error: { code: 'EXIT_1', name: 'ToolError' },
+      error: { code: 'FS_NOT_FOUND', name: 'FsError' },
+      message: {
+        content: [
+          { content: [{ text: 'cannot read "gone.ts": not found', type: 'text' }], isError: true, toolCallId: 'r1', type: 'tool-result' }
+        ]
+      },
+      step: 1,
+      turn: 1
+    })
+
+    const done = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
+
+    expect(done.payload.error).toBe('Error: cannot read "gone.ts": not found')
+  })
+
+  it('falls back to the harness error identity when the call failed silently', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    w.fire('turn/start', { turn: 1 })
+    w.fire('tool/call', { arguments: '{}', callId: 'r2', name: 'read', step: 1, turn: 1 })
+    w.fire('tool/result', {
+      error: { code: 'FS_DENIED', name: 'FsError' },
+      message: { content: [{ content: [], isError: true, toolCallId: 'r2', type: 'tool-result' }] },
+      step: 1,
+      turn: 1
+    })
+
+    const done = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
+
+    expect(done.payload.error).toBe('Error: FsError: FS_DENIED')
+  })
+
+  it('treats a non-zero exit as a failed call, status first then the command’s output', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    w.fire('turn/start', { turn: 1 })
+    w.fire('tool/call', { arguments: '{"command":"ls nope"}', callId: 'b9', name: 'failing_bash', step: 1, turn: 1 })
+    w.fire('tool/result', {
+      message: { content: [{ content: [{ text: 'raw', type: 'text' }], toolCallId: 'b9', type: 'tool-result' }] },
+      step: 1,
+      turn: 1
+    })
+
+    const done = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
+
+    expect(done.payload.error).toBe('Error: Exit code 1\nls: nope: No such file or directory')
+  })
+
+  it('names the signal when a command was killed rather than exiting', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    w.fire('turn/start', { turn: 1 })
+    w.fire('tool/call', { arguments: '{"command":"sleep 99"}', callId: 'b8', name: 'killed_bash', step: 1, turn: 1 })
+    w.fire('tool/result', {
+      message: { content: [{ content: [{ text: 'raw', type: 'text' }], toolCallId: 'b8', type: 'tool-result' }] },
+      step: 1,
+      turn: 1
+    })
+
+    const done = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
+
+    expect(done.payload.error).toBe('Error: Killed by SIGTERM\npartial')
+  })
+
+  it('unwraps a generic card’s fenced body, which the ⎿ row renders literally', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    w.fire('turn/start', { turn: 1 })
+    w.fire('tool/call', { arguments: '{}', callId: 'g1', name: 'fenced', step: 1, turn: 1 })
+    w.fire('tool/result', {
+      message: { content: [{ content: [{ text: 'raw', type: 'text' }], toolCallId: 'g1', type: 'tool-result' }] },
+      step: 1,
+      turn: 1
+    })
+
+    const done = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
+
+    expect(done.payload.result_text).toBe('boom')
+  })
+
+  it('marks a result flagged isError as failed even with no harness error identity', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+
+    w.fire('turn/start', { turn: 1 })
+    w.fire('tool/call', { arguments: '{}', callId: 'c9', name: 'read', step: 1, turn: 1 })
+    w.fire('tool/result', {
       message: { content: [{ content: [{ text: 'boom', type: 'text' }], isError: true, toolCallId: 'c9', type: 'tool-result' }] },
       step: 1,
       turn: 1
@@ -272,7 +388,7 @@ describe('HarnessGatewayClient', () => {
     const toolDone = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
 
     expect(toolDone.type).toBe('tool.complete')
-    expect(toolDone.payload.error).toBe('ToolError: EXIT_1')
+    expect(toolDone.payload.error).toBe('Error: boom')
   })
 
   it('routes prompt.submit/steer/interrupt to the agent', async () => {

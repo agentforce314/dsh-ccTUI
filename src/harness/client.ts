@@ -73,6 +73,36 @@ const textOf = (blocks: readonly ContentBlock[] | undefined, kinds: ReadonlyArra
   return out.join('')
 }
 
+/**
+ * The `⎿ Error: …` line a failed call renders.
+ *
+ * The original prints the tool's OWN message there — "File does not exist.
+ * Note: your current working directory is …", "Exit code 1" over the command's
+ * stderr. The harness splits that in two: `tool/result.error` carries the
+ * structured identity (`FsError` / `FS_NOT_FOUND`) while the human-readable
+ * message rides the result content the model reads. Building the row from the
+ * identity alone rendered `⎿ FsError: FS_NOT_FOUND` — accurate, and useless to
+ * anyone deciding what to do next.
+ *
+ * So: the message when there is one, the identity when there is not, and never
+ * both, because the identity is a restatement of the message's first clause in
+ * every case the tools produce. `Error: ` goes on here rather than in the
+ * renderer — the trail line is built from this string, and upstream's own
+ * fixtures arrive already carrying the prefix.
+ */
+const failureText = (message: string, identity?: { code: string; name: string }): string => {
+  const body = message.trim() || (identity ? `${identity.name}: ${identity.code}` : '') || 'tool failed'
+
+  return /^error\b/i.test(body) ? body : `Error: ${body}`
+}
+
+/** Strip a lone ```lang fence so a fenced body reads as plain output. */
+const unfence = (text: string): string => {
+  const match = /^```[^\n]*\n([\s\S]*?)\n?```$/.exec(text.trim())
+
+  return match ? match[1]! : text
+}
+
 const prettyArgs = (raw: string): string => {
   try {
     const parsed = JSON.parse(raw)
@@ -421,7 +451,8 @@ export class HarnessGatewayClient extends GatewayClient {
         this.publishLocalEvent({
           payload: {
             duration_s: startedAt ? Math.max(0, Date.now() - startedAt) / 1000 : undefined,
-            error: error ? `${error.name}: ${error.code}` : block.isError ? view.resultText || 'tool failed' : undefined,
+            error:
+              error || block.isError || view.failed ? failureText(view.resultText, error) : undefined,
             name: this.callNames.get(id),
             result_text: view.resultText,
             structured_diff: view.structuredDiff,
@@ -656,7 +687,7 @@ export class HarnessGatewayClient extends GatewayClient {
     content: readonly ContentBlock[],
     isError: boolean,
     meta: unknown
-  ): { resultText: string; structuredDiff?: StructuredDiffPayload } {
+  ): { failed?: boolean; resultText: string; structuredDiff?: StructuredDiffPayload } {
     const fallback = textOf(content, ['text'])
     const name = this.callNames.get(callId)
     const rawArgs = this.callRawArgs.get(callId)
@@ -721,16 +752,34 @@ export class HarnessGatewayClient extends GatewayClient {
     }
 
     if (view.card === 'terminal') {
-      const terminal = view as { exitCode?: number; output?: string }
-      const lines = [terminal.output ?? '']
+      const terminal = view as { exitCode?: number; output?: string; signal?: string }
+      const body = (terminal.output ?? '').replace(/\n+$/, '')
+      // A command that exits non-zero is a FAILED call in the original — red
+      // bullet, `⎿ Error: Exit code 1` with the command's own stderr beneath.
+      // The harness reports it as an ordinary result (a shell exit is not a
+      // tool error), so the exit status is the only thing that can say so.
+      const signal = terminal.signal
+      const exitCode = terminal.exitCode
+      const failed = signal !== undefined || (typeof exitCode === 'number' && exitCode !== 0)
 
-      if (typeof terminal.exitCode === 'number' && terminal.exitCode !== 0) {
-        lines.push(`[exit code: ${terminal.exitCode}]`)
+      if (!failed) {
+        return { resultText: body || fallback }
       }
 
-      const output = lines.filter(Boolean).join(String.fromCharCode(10))
+      const status = signal === undefined ? `Exit code ${exitCode}` : `Killed by ${signal}`
 
-      return { resultText: output || fallback }
+      return { failed: true, resultText: [status, body].filter(Boolean).join(String.fromCharCode(10)) }
+    }
+
+    if (view.card === 'generic') {
+      // The escape hatch every tool shares: a replacement body for the row. A
+      // tool that fenced its output for a markdown client (the shell tools do
+      // this on the failure path) would otherwise render its backticks
+      // literally in a `⎿` row that does no markdown.
+      const generic = view as { content?: ContentBlock[] }
+      const text = generic.content ? textOf(generic.content, ['text']) : ''
+
+      return { resultText: unfence(text) || fallback }
     }
 
     if (view.card === 'search') {
