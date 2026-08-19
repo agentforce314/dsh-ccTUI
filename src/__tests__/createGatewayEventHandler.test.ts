@@ -95,6 +95,33 @@ describe('createGatewayEventHandler', () => {
     expect(getTurnState().todos).toEqual(todos)
   })
 
+  it('pins a checklist whose rows carry no id of their own', () => {
+    // deepseek-harness replaces the WHOLE list on every write, so its todos are
+    // just {content, status}. Requiring an id dropped every row and the HUD
+    // rendered nothing at all — the id is only a React key, and a whole-list
+    // write makes the position a stable one.
+    const appended: Msg[] = []
+    const onEvent = createGatewayEventHandler(buildCtx(appended))
+
+    onEvent({ payload: {}, type: 'message.start' } as any)
+    onEvent({
+      payload: {
+        name: 'todo_write',
+        todos: [
+          { content: 'first task', status: 'in_progress' },
+          { content: 'second task', status: 'pending' }
+        ],
+        tool_id: 'todo-1'
+      },
+      type: 'tool.start'
+    } as any)
+
+    expect(getTurnState().todos).toEqual([
+      { content: 'first task', id: 'todo-0', status: 'in_progress' },
+      { content: 'second task', id: 'todo-1', status: 'pending' }
+    ])
+  })
+
   it('archives completed todos into transcript flow at end of turn', () => {
     const appended: Msg[] = []
     const todos = [{ content: 'Serve tiny latte', id: 'serve', status: 'completed' }]

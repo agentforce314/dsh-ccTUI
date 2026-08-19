@@ -25,6 +25,8 @@ describe('isChecklistHudTool', () => {
     expect(isChecklistHudTool('TodoWrite')).toBe(true)
     expect(isChecklistHudTool('TaskCreate')).toBe(true)
     expect(isChecklistHudTool('TaskUpdate')).toBe(true)
+    // the harness's spelling of the same tool — names arrive raw, not as labels
+    expect(isChecklistHudTool('todo_write')).toBe(true)
     // Reads whose output the HUD never shows.
     expect(isChecklistHudTool('TaskList')).toBe(false)
     expect(isChecklistHudTool('TaskGet')).toBe(false)

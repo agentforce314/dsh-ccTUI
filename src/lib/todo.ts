@@ -15,7 +15,9 @@ export const todoTone = (status: TodoItem['status']): TodoTone =>
 // `⏺ TaskCreate(…) ⎿ {"task":{"id":"1383531298b4",…}}` rows up front and
 // another `⏺ TaskUpdate ⎿ {"success":true,…,"statusChange":{…}}` row per
 // status flip — a screen of JSON restating what the HUD already draws.
-const CHECKLIST_HUD_TOOLS = new Set(['TaskCreate', 'TaskUpdate', 'TodoWrite'])
+// `todo_write` is the harness's spelling of the same tool. Names arrive here
+// raw (the wire name, not the trail label), so both have to be listed.
+const CHECKLIST_HUD_TOOLS = new Set(['TaskCreate', 'TaskUpdate', 'TodoWrite', 'todo_write'])
 
 export const isChecklistHudTool = (name?: string) => Boolean(name && CHECKLIST_HUD_TOOLS.has(name))
 
