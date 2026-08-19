@@ -4,7 +4,7 @@
 import { LlmAdapter } from '@deepseek-ai/dsh-llm'
 
 export const name = 'probe-llm'
-export const inject = ['llm']
+export const inject = ['llm', 'web']
 
 const lastUserIndex = messages => {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -55,6 +55,43 @@ class ProbeAdapter extends LlmAdapter {
   }
 }
 
+// Canned web providers. dsh-base ships no local fetch provider and its search
+// provider wants a DeepSeek key, so probing the web tools' cards would
+// otherwise need the network and a credential. These keep the gallery offline
+// and its captures byte-stable.
+const PAGE = [
+  '# Example Domain',
+  '',
+  'This domain is for use in illustrative examples in documents.',
+  ''
+].join('\n')
+
+const fetchProvider = {
+  id: 'probe',
+  available: () => true,
+  fetch: async request => ({
+    body: { content: PAGE, kind: 'text' },
+    statusCode: request.url.includes('missing') ? 404 : 200,
+    truncated: false,
+    url: request.url
+  })
+}
+
+const searchProvider = {
+  id: 'probe',
+  available: () => true,
+  search: async request => ({
+    content: `answer for ${request.query}`,
+    sources: [
+      { snippet: 'the harness itself', title: 'deepseek-harness', url: 'https://github.com/deepseek-ai/deepseek-harness' },
+      { title: 'dsh-ccTUI', url: 'https://github.com/agentforce314/dsh-ccTUI' }
+    ],
+    truncated: false
+  })
+}
+
 export function apply(ctx) {
   ctx.llm.registerAdapter(['mock'], new ProbeAdapter())
+  ctx.web.registerFetchProvider(fetchProvider)
+  ctx.web.registerSearchProvider(searchProvider)
 }

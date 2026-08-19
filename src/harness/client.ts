@@ -118,6 +118,83 @@ const readCard = (view: {
   }
 }
 
+/** `559 bytes` / `1.2KB` — the size the original reports a fetch by. */
+const byteSize = (bytes: number): string => {
+  if (bytes < 1024) {
+    return `${bytes} ${bytes === 1 ? 'byte' : 'bytes'}`
+  }
+
+  return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)}KB` : `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+/** The status phrases a fetch actually comes back with; anything else shows
+ *  bare, because `(418)` beats inventing a phrase for it. */
+const STATUS_TEXT: Record<number, string> = {
+  200: 'OK',
+  201: 'Created',
+  204: 'No Content',
+  301: 'Moved Permanently',
+  302: 'Found',
+  304: 'Not Modified',
+  400: 'Bad Request',
+  401: 'Unauthorized',
+  403: 'Forbidden',
+  404: 'Not Found',
+  408: 'Request Timeout',
+  410: 'Gone',
+  429: 'Too Many Requests',
+  500: 'Internal Server Error',
+  502: 'Bad Gateway',
+  503: 'Service Unavailable',
+  504: 'Gateway Timeout'
+}
+
+/**
+ * A web call's ⎿ line.
+ *
+ * A fetch answers with the retrieval, not the page: `Received 559 bytes
+ * (200 OK)`. The markdown body is already the model's, and a whole page pasted
+ * into the transcript is a page nobody reads — it stays behind ctrl+o.
+ *
+ * A search answers `Did 1 search in 7s` and stops: what the search FOUND is the
+ * model's answer to give, and the row's job is to account for the round trip.
+ * The cited sources — the one thing the result text cannot losslessly carry,
+ * which is why the harness projects them through presentation meta at all —
+ * ride behind ctrl+o.
+ */
+const webCard = (
+  view: {
+    answer?: string
+    kind?: string
+    sources?: { title?: string; url: string }[]
+    statusCode?: number
+    truncated?: boolean
+    url?: string
+  },
+  fallback: string,
+  durationS?: number
+): { resultRaw?: string; resultText: string } => {
+  if (view.kind === 'fetch') {
+    const code = view.statusCode ?? 0
+    const phrase = STATUS_TEXT[code]
+    const status = [phrase ? `${code} ${phrase}` : String(code), view.truncated ? 'truncated' : '']
+      .filter(Boolean)
+      .join(', ')
+
+    return { resultRaw: fallback, resultText: `Received ${byteSize(fallback.length)} (${status})` }
+  }
+
+  const sources = view.sources ?? []
+  const took = durationS === undefined ? '' : ` in ${Math.max(1, Math.round(durationS))}s`
+  const cited = `${plural(sources.length, 'source')}${view.truncated ? ' (capped)' : ''}`
+  const rows = sources.map(source => (source.title ? `${source.title} — ${source.url}` : source.url))
+
+  return {
+    resultRaw: [cited, ...rows, view.answer ?? ''].filter(Boolean).join('\n'),
+    resultText: `Did 1 search${took}`
+  }
+}
+
 /**
  * A search's ⎿ line, over the rows it found: `Found 37 files` for a path search,
  * `Found 6 lines` for a content search — the original's own two phrasings, and
@@ -499,13 +576,14 @@ export class HarnessGatewayClient extends GatewayClient {
         const block = message.content[0]
         const id = String(block.toolCallId)
         const startedAt = this.callStarted.get(id)
-        const view = this.presentResult(id, block.content, Boolean(block.isError), meta)
+        const durationS = startedAt === undefined ? undefined : Math.max(0, Date.now() - startedAt) / 1000
+        const view = this.presentResult(id, block.content, Boolean(block.isError), meta, durationS)
         const todos = this.pendingTodos
 
         this.pendingTodos = null
         this.publishLocalEvent({
           payload: {
-            duration_s: startedAt ? Math.max(0, Date.now() - startedAt) / 1000 : undefined,
+            duration_s: durationS,
             error:
               error || block.isError || view.failed ? failureText(view.resultText, error) : undefined,
             name: this.callNames.get(id),
@@ -742,7 +820,8 @@ export class HarnessGatewayClient extends GatewayClient {
     callId: string,
     content: readonly ContentBlock[],
     isError: boolean,
-    meta: unknown
+    meta: unknown,
+    durationS?: number
   ): { failed?: boolean; resultRaw?: string; resultText: string; structuredDiff?: StructuredDiffPayload } {
     const fallback = textOf(content, ['text'])
     const name = this.callNames.get(callId)
@@ -847,6 +926,21 @@ export class HarnessGatewayClient extends GatewayClient {
           total?: number
           truncated?: boolean
         }
+      )
+    }
+
+    if (view.card === 'web') {
+      return webCard(
+        view as {
+          answer?: string
+          kind?: string
+          sources?: { title?: string; url: string }[]
+          statusCode?: number
+          truncated?: boolean
+          url?: string
+        },
+        fallback,
+        durationS
       )
     }
 
