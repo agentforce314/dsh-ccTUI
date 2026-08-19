@@ -8,6 +8,35 @@ with diff cards, approval and question prompts, plan review, session switcher an
 slash commands, model picker, context bar — running **in-process** against harness services
 (`ctx.agents`, `session/event`, the approval waterfall, `ctx.userQuestions`, `ctx.commands`).
 
+```
+ ██████╗ ███████╗██╗  ██╗         ██████╗ ██████╗████████╗██╗   ██╗██╗
+ ██╔══██╗██╔════╝██║  ██║        ██╔════╝██╔════╝╚══██╔══╝██║   ██║██║
+ ██║  ██║███████╗███████║ █████╗ ██║     ██║        ██║   ██║   ██║██║
+ ██║  ██║╚════██║██╔══██║ ╚════╝ ██║     ██║        ██║   ██║   ██║██║
+ ██████╔╝███████║██║  ██║        ╚██████╗╚██████╗   ██║   ╚██████╔╝██║
+ ╚═════╝ ╚══════╝╚═╝  ╚═╝         ╚═════╝ ╚═════╝   ╚═╝    ╚═════╝ ╚═╝
+ 🐳 Claude Code style TUI for Deepseek-Harness
+
+ ╭─── dsh-ccTUI v0.3.0 ─────────────────────────────────────────────────────────────────────────╮
+ │                                                                                              │
+ │           Welcome back, you                 │ ▾ Available Tools                              │
+ │                                             │ harness: bash, create_goal, edit, …+22         │
+ │                    : ' :                    │                                                │
+ │                 ___'_______                 │ ▸ Available Skills (0)                         │
+ │               /'  o        \--.             │                                                │
+ │              |              ___\            │ ────────────────────────────────────────────── │
+ │               \____________/  \/            │ 25 tools · 0 skills · /help for commands       │
+ │                  \__/  \__/                 │                                                │
+ │                                             │                                                │
+ │                ────────────                 │                                                │
+ │           Model deepseek-v4-flash           │                                                │
+ │   Path ~/workspace/dsh-ccTUI                │                                                │
+ │    Perms Ask for approval · /permissions    │                                                │
+ │ Session cctui-56b37bee-41fd-4feb-b270-5988… │                                                │
+ │                                                                                              │
+ ╰──────────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
 ## Install
 
 Requires Node ≥ 22.19, npm, pnpm, and the `dsh` CLI (`npm install -g @deepseek-ai/dsh`).
