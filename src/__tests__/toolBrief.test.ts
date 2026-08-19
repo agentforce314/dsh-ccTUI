@@ -228,6 +228,43 @@ describe('ToolTrail brief render', () => {
     expect(out).not.toContain('hello')
   })
 
+  it('runs a clock on a tool that is still going', () => {
+    // upstream's running row is `$ <cmd> (6s · 7 lines)`; the line count needs
+    // output the harness does not publish mid-call, so the elapsed half is
+    // what can be told truthfully
+    const startedAt = Date.now() - 6_200
+    const out = stripAnsi(
+      renderToString(
+        React.createElement(ToolTrail, {
+          detailsMode: 'expanded',
+          t: DEFAULT_THEME,
+          tools: [{ context: 'sleep 30', id: 't1', name: 'bash', startedAt }],
+          trail: []
+        })
+      )
+    )
+
+    expect(out).toContain('Bash(sleep 30)')
+    expect(out).toContain('Running… (6s)')
+  })
+
+  it('holds the clock back until a call has actually taken a second', () => {
+    const out = stripAnsi(
+      renderToString(
+        React.createElement(ToolTrail, {
+          detailsMode: 'expanded',
+          t: DEFAULT_THEME,
+          tools: [{ context: 'true', id: 't1', name: 'bash', startedAt: Date.now() }],
+          trail: []
+        })
+      )
+    )
+
+    // a call that returns immediately must never flash a `(0s)`
+    expect(out).toContain('Running…')
+    expect(out).not.toContain('(0s)')
+  })
+
   it('puts every call back under ctrl+o', () => {
     const out = stripAnsi(
       renderToString(React.createElement(ToolTrail, { detailsMode: 'expanded', t: DEFAULT_THEME, trail }))
