@@ -52,6 +52,33 @@ Model/provider configuration comes from your dsh profile (`agent-default-model` 
 an `- id: cctui` config override in the profile's `cordis.patch.yml`: `provider`, `model`,
 `cwd`, `sessionId`).
 
+### API key
+
+The TUI stores no key; the harness resolves one per request. Write it to the managed store
+at `$DSH_HOME/.credentials.yaml` (default `~/.dsh/.credentials.yaml`) — a YAML mapping of
+credential reference to value and nothing else:
+
+```yaml
+DEEPSEEK_API_KEY: sk-…
+```
+
+`chmod 600` that file and `chmod 700 ~/.dsh`: `dsh-credentials-local` refuses to read a
+document carrying any group or other permission bit, and fails at boot naming the repair.
+The document is watched, so a key stored while the TUI is running takes effect on the next
+request — first run is "browse models, store the key, prompt again", no restart in between.
+Until one resolves, the route stays registered and `/model` stays browsable; it is the
+request that fails, with `MISSING_CREDENTIAL` naming every entry point it looked at.
+
+The launching environment beats the store (`DEEPSEEK_API_KEY=… dsh --profile dsh-cctui`) and
+is deliberately read-only from inside; the store in turn beats `<cwd>/.env` and
+`~/.dsh/.env`. Keep the key itself out of `cordis.patch.yml` — adapter config carries only
+`apiKeyEnv`, the reference to resolve. One key covers both the conversation and the
+`web_search` tool.
+
+Mode `0600` stops other OS users, not the model: the harness never hands it the document's
+path and never loads the value into the environment, but bash and the filesystem tools run
+as you and the shipped policy confines writes rather than reads.
+
 ## Highlights
 
 - **Conversation loop**: streamed deltas render live; reasoning behind Ctrl+O/Ctrl+R density
