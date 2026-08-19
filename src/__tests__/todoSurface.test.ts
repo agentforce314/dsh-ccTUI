@@ -300,9 +300,9 @@ describe('TodoPanel rendering', () => {
     expect(plain).toMatch(/◻ Add tests/)
     // done rows: strikethrough SGR (9); in-progress: bold around subject
     expect(output).toContain('\x1b[9m')
-    // icon colors: ✔ success green (78;186;101), ◼ claude orange (215,119,87 → hex D77757)
+    // icon colors: ✔ success green (78;186;101), ◼ brand blue (77;107;254 → hex 4D6BFE)
     expect(output).toContain('78;186;101')
-    expect(output).toContain('215;119;87')
+    expect(output).toContain('77;107;254')
   })
 
   it('caps the visible list and summarizes the overflow', () => {

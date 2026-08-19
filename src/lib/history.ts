@@ -2,9 +2,11 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import { appHome } from './appHome.js'
+
 const MAX = 1000
-const dir = process.env.CLAWCODEX_HOME ?? join(homedir(), '.clawcodex')
-const file = join(dir, '.clawcodex_history')
+const dir = appHome()
+const file = join(dir, 'history.jsonl')
 
 let cache: string[] | null = null
 

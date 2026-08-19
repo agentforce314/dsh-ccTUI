@@ -63,7 +63,7 @@ const LOGO_ART = [
 ]
 
 // dsh-ccTUI mascot — a blue whale, matching the DeepSeek brand. Painted from
-// the active /logo gradient (default: whale blues), beside the session panel.
+// the active /logo gradient (default: ocean blues), beside the session panel.
 const WHALE_ART = [
   '       : \' :',
   '    ___\'_______',
@@ -73,16 +73,17 @@ const WHALE_ART = [
   '     \\__/  \\__/'
 ]
 
-// DeepSeek "whale" logo gradient — sky blue down to deep sea, anchored on the
-// DeepSeek brand blue #4D6BFE, independent of the active theme palette so the
-// wordmark always reads as brand.
+// The brand ramp: the "ocean" palette's stops — sky blue down to deep sea,
+// matching DeepSeek's blue. Held here as strings (not read from LOGO_PALETTES)
+// so the shipped wordmark look is pinned even if a palette entry is retuned;
+// the two are kept identical and a test asserts it.
 const LOGO_BRAND = [
-  'rgb(150,180,255)',
-  'rgb(110,145,255)',
-  'rgb(77,107,254)',
-  'rgb(56,82,215)',
-  'rgb(40,60,170)',
-  'rgb(28,42,120)'
+  'rgb(170,220,255)',
+  'rgb(125,185,240)',
+  'rgb(80,150,220)',
+  'rgb(55,115,190)',
+  'rgb(40,85,150)',
+  'rgb(25,55,110)'
 ] as const
 
 export const LOGO_WIDTH = Math.max(...LOGO_ART.map(line => line.length))
@@ -91,9 +92,9 @@ export const WHALE_WIDTH = Math.max(...WHALE_ART.map(line => line.length))
 // /logo palette → banner painting (applied at the banner's startup paint; the
 // intro row is committed to scrollback, so a mid-session /logo shows on the
 // NEXT launch, matching the original). The unset default AND an explicit
-// "whale" both keep the shipped look (brand LOGO_BRAND wordmark, whale-blue
-// mascot): "Whale (default)" IS dsh-ccTUI's default scheme, and picking it
-// must return exactly to it. Only a non-default palette changes the paint —
+// "ocean" both keep the shipped look (brand LOGO_BRAND wordmark, ocean-blue
+// whale): "Ocean blue (default)" IS dsh-ccTUI's default scheme, and picking
+// it must return exactly to it. Only a non-default palette changes the paint —
 // wordmark rows one gradient stop each, mascot rows sampled from the same
 // gradient so the whale never clashes with the wordmark. Skin overrides
 // (customLogo / customHero) win over the palette: a skin is a full rebrand,

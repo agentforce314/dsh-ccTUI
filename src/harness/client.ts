@@ -7,7 +7,9 @@
 // Boundary rule: src/harness/ is the ONLY directory allowed to import
 // @deepseek-ai/* (see docs/ARCHITECTURE.md).
 import { randomUUID } from 'node:crypto'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { join } from 'node:path'
 
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection, type Agent, type AgentHandle, type ModelSelection, type ModelSelectionRef } from '@deepseek-ai/dsh-agent'
@@ -19,6 +21,7 @@ import type { AskUserQuestionAnswer, AskUserQuestionItem, AskUserQuestionRequest
 import type {} from '@deepseek-ai/dsh-plan-mode'
 
 import { GatewayClient, SLASHES } from '../gatewayClient.js'
+import { appHome } from '../lib/appHome.js'
 import { structuredPatch } from 'diff'
 
 import type { GatewayTranscriptMessage, StructuredDiffPayload } from '../gatewayTypes.js'
@@ -1359,6 +1362,32 @@ export class HarnessGatewayClient extends GatewayClient {
       }
 
       case 'config.set': {
+        if (String(p.key ?? '') === 'logoColor') {
+          // Banner palette is a TUI-local preference: no harness service owns
+          // it, so persist it in the app's own config (read back at the next
+          // launch's first paint by readLogoColorSync).
+          const value = String(p.value ?? '')
+
+          try {
+            const dir = appHome()
+            const file = join(dir, 'config.json')
+            let current: Record<string, unknown> = {}
+
+            try {
+              current = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+            } catch {
+              current = {}
+            }
+
+            mkdirSync(dir, { recursive: true })
+            writeFileSync(file, `${JSON.stringify({ ...current, logoColor: value }, null, 2)}\n`, 'utf8')
+
+            return Promise.resolve({ ok: true, value } as T)
+          } catch (err) {
+            return Promise.resolve({ error: err instanceof Error ? err.message : String(err), ok: false } as T)
+          }
+        }
+
         if (String(p.key ?? '') === 'model') {
           return this.applyModelSwitch(String(p.value ?? '')).then(r => r as T)
         }

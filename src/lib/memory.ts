@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import { pipeline } from 'node:stream/promises'
 import { getHeapSnapshot, getHeapSpaceStatistics, getHeapStatistics } from 'node:v8'
 
+import { appHomePath } from './appHome.js'
+
 export type MemoryTrigger = 'auto-critical' | 'auto-high' | 'manual'
 
 export interface MemoryDiagnostics {
@@ -148,7 +150,7 @@ export async function performHeapDump(trigger: MemoryTrigger = 'manual'): Promis
     // Diagnostics first — heap-snapshot serialization can crash on very large
     // heaps, and the JSON sidecar is the most actionable artifact if so.
     const diagnostics = await captureMemoryDiagnostics(trigger)
-    const dir = process.env.CLAWCODEX_HEAPDUMP_DIR?.trim() || join(homedir() || tmpdir(), '.clawcodex', 'heapdumps')
+    const dir = process.env.CLAWCODEX_HEAPDUMP_DIR?.trim() || appHomePath('heapdumps')
 
     await mkdir(dir, { recursive: true })
 

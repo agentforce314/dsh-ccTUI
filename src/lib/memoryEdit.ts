@@ -3,6 +3,8 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, join, relative } from 'node:path'
 
+import { APP_DIR_NAME } from './appHome.js'
+
 import { resolveEditor } from './editor.js'
 
 /**
@@ -28,7 +30,7 @@ const EDITOR_WAIT_FLAGS: Record<string, string> = {
 /** Port of memory.tsx:23-41 — mkdir the config home when the target lives
  *  under it, then exclusive-create so existing content is preserved. */
 export const ensureMemoryFile = (path: string, home: string = homedir()): void => {
-  const configHome = join(home, '.clawcodex')
+  const configHome = join(home, APP_DIR_NAME)
 
   if (path.startsWith(configHome)) {
     mkdirSync(configHome, { recursive: true })

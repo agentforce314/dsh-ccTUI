@@ -1,6 +1,9 @@
 // HarnessGatewayClient translation unit tests: synthetic harness session
 // events in, clawcodex GatewayEvents out — no real cordis tree needed.
-import { describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { GatewayEvent } from '../gatewayTypes.js'
 import { HarnessGatewayClient } from '../harness/client.js'
@@ -640,5 +643,42 @@ describe('HarnessGatewayClient', () => {
     w.fire('assistant/chunk', { chunk: { argumentsDelta: '}', id: 'g1', index: 0, name: 'bash', type: 'tool-call-delta' }, step: 1, turn: 1 })
 
     expect(w.events.filter(e => e.type === 'tool.generating')).toHaveLength(1)
+  })
+
+  it('persists the /logo palette into the app config (not clawcodex\'s)', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'dsh-cctui-logo-rpc-'))
+
+    vi.stubEnv('DSH_CCTUI_HOME', home)
+
+    try {
+      const w = makeWorld()
+
+      w.client.start()
+      await settle()
+
+      await expect(w.client.request('config.set', { key: 'logoColor', value: 'forest' })).resolves.toEqual({
+        ok: true,
+        value: 'forest'
+      })
+
+      const written = JSON.parse(readFileSync(join(home, 'config.json'), 'utf8')) as { logoColor?: string }
+
+      expect(written.logoColor).toBe('forest')
+
+      const { readLogoColorSync } = await import('../lib/logoPalettes.js')
+
+      expect(readLogoColorSync()).toBe('forest')
+
+      // an unrelated key already in the file survives the write
+      writeFileSync(join(home, 'config.json'), JSON.stringify({ keepMe: 1, logoColor: 'forest' }))
+      await w.client.request('config.set', { key: 'logoColor', value: 'ocean' })
+
+      const merged = JSON.parse(readFileSync(join(home, 'config.json'), 'utf8')) as Record<string, unknown>
+
+      expect(merged).toMatchObject({ keepMe: 1, logoColor: 'ocean' })
+    } finally {
+      vi.unstubAllEnvs()
+      rmSync(home, { force: true, recursive: true })
+    }
   })
 })

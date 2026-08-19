@@ -20,7 +20,7 @@ describe('ensureMemoryFile', () => {
   })
 
   it('creates the config home and file for the user memory target', () => {
-    const path = join(home, '.clawcodex', 'CLAWCODEX.md')
+    const path = join(home, '.dsh-cctui', 'CLAWCODEX.md')
 
     ensureMemoryFile(path, home)
 

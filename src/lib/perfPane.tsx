@@ -15,13 +15,15 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
+import { appHomePath } from './appHome.js'
+
 import type { FrameEvent } from '@clawcodex/ink'
 import { scrollFastPathStats } from '@clawcodex/ink'
 import { Profiler, type ProfilerOnRenderCallback, type ReactNode } from 'react'
 
 const ENABLED = /^(?:1|true|yes|on)$/i.test((process.env.CLAWCODEX_DEV_PERF ?? '').trim())
 const THRESHOLD_MS = Number(process.env.CLAWCODEX_DEV_PERF_MS ?? '2') || 0
-const LOG_PATH = process.env.CLAWCODEX_DEV_PERF_LOG?.trim() || join(homedir(), '.clawcodex', 'perf.log')
+const LOG_PATH = process.env.CLAWCODEX_DEV_PERF_LOG?.trim() || appHomePath('perf.log')
 
 let logReady = false
 
