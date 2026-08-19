@@ -1,6 +1,6 @@
 import { PassThrough } from 'node:stream'
 
-import { renderSync } from '@clawcodex/ink'
+import { renderSync } from '@dsh-cctui/ink'
 import React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 

@@ -6,8 +6,8 @@ vi.mock('../lib/memory.js', () => ({
   performHeapDump: vi.fn(async () => null)
 }))
 
-// @clawcodex/ink is dynamically imported only on the dump path; stub the eviction.
-vi.mock('@clawcodex/ink', () => ({ evictInkCaches: vi.fn() }))
+// @dsh-cctui/ink is dynamically imported only on the dump path; stub the eviction.
+vi.mock('@dsh-cctui/ink', () => ({ evictInkCaches: vi.fn() }))
 
 import { startMemoryMonitor } from '../lib/memoryMonitor.js'
 

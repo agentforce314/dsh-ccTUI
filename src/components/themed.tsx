@@ -1,4 +1,4 @@
-import { Text } from '@clawcodex/ink'
+import { Text } from '@dsh-cctui/ink'
 import { useStore } from '@nanostores/react'
 import type { ReactNode } from 'react'
 

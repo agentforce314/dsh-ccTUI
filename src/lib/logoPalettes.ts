@@ -126,7 +126,7 @@ export function gradientStopForRow(stops: readonly RGB[], i: number, n: number):
  * The persisted `logoColor` palette name, or `''` when unset/invalid/unreadable.
  * Synchronous on purpose: the banner is the first transcript row and must paint
  * correctly before the backend is up (~20s cold start), exactly like the
- * original's `getGlobalConfig()` read. `CLAWCODEX_HOME` matches lib/history.ts.
+ * original's `getGlobalConfig()` read. `DSH_CCTUI_HOME` matches lib/history.ts.
  */
 export function readLogoColorSync(): '' | LogoPaletteName {
   try {

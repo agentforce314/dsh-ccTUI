@@ -1,4 +1,4 @@
-import { supportsHyperlinks } from '@clawcodex/ink'
+import { supportsHyperlinks } from '@dsh-cctui/ink'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { LINK_TIP_TEXT, linkOpenHotkey, linkTipFor, resetLinkTipForTests } from './linkAffordance.js'

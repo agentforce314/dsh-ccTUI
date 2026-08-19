@@ -1,4 +1,4 @@
-import { stringWidth, wrapAnsi } from '@clawcodex/ink'
+import { stringWidth, wrapAnsi } from '@dsh-cctui/ink'
 
 import type { Role } from '../types.js'
 

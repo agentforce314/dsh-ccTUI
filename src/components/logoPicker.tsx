@@ -1,4 +1,4 @@
-import { Box, Text, useInput } from '@clawcodex/ink'
+import { Box, Text, useInput } from '@dsh-cctui/ink'
 import { useState } from 'react'
 
 import { wordmarkGradient } from '../banner.js'

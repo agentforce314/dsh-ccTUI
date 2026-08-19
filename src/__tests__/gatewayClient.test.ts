@@ -53,13 +53,13 @@ const INIT = {
 }
 
 describe('GatewayClient NDJSON adapter', () => {
-  const prevWs = process.env.CLAWCODEX_WORKSPACE
+  const prevWs = process.env.DSH_CCTUI_WORKSPACE
   let events: any[]
   let gw: GatewayClient
   let proc: FakeProc
 
   beforeEach(() => {
-    process.env.CLAWCODEX_WORKSPACE = '/ws'
+    process.env.DSH_CCTUI_WORKSPACE = '/ws'
     proc = new FakeProc()
     harness.proc = proc
     harness.spawnCalls = []
@@ -73,8 +73,8 @@ describe('GatewayClient NDJSON adapter', () => {
   afterEach(() => {
     gw.kill()
 
-    if (prevWs === undefined) {delete process.env.CLAWCODEX_WORKSPACE}
-    else {process.env.CLAWCODEX_WORKSPACE = prevWs}
+    if (prevWs === undefined) {delete process.env.DSH_CCTUI_WORKSPACE}
+    else {process.env.DSH_CCTUI_WORKSPACE = prevWs}
   })
 
   const types = () => events.map(e => e.type)

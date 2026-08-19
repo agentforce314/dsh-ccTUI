@@ -4,9 +4,9 @@
 //   logFrameEvent (ink.onFrame) → yoga / renderer / diff / optimize / write
 //                                 phases + yoga counters + scroll fast-path
 //
-// Both gate on CLAWCODEX_DEV_PERF=1 and dump JSON-lines (default ~/.clawcodex/perf.log,
-// override CLAWCODEX_DEV_PERF_LOG). Tagged { src: 'react' | 'frame' } for jq.
-// CLAWCODEX_DEV_PERF_MS (default 2) skips sub-ms idle frames; set 0 to capture all.
+// Both gate on DSH_CCTUI_DEV_PERF=1 and dump JSON-lines (default ~/.clawcodex/perf.log,
+// override DSH_CCTUI_DEV_PERF_LOG). Tagged { src: 'react' | 'frame' } for jq.
+// DSH_CCTUI_DEV_PERF_MS (default 2) skips sub-ms idle frames; set 0 to capture all.
 //
 // Zero cost when unset: PerfPane returns children directly, logFrameEvent is
 // undefined so ink doesn't pay the timing cost.
@@ -17,13 +17,13 @@ import { dirname, join } from 'node:path'
 
 import { appHomePath } from './appHome.js'
 
-import type { FrameEvent } from '@clawcodex/ink'
-import { scrollFastPathStats } from '@clawcodex/ink'
+import type { FrameEvent } from '@dsh-cctui/ink'
+import { scrollFastPathStats } from '@dsh-cctui/ink'
 import { Profiler, type ProfilerOnRenderCallback, type ReactNode } from 'react'
 
-const ENABLED = /^(?:1|true|yes|on)$/i.test((process.env.CLAWCODEX_DEV_PERF ?? '').trim())
-const THRESHOLD_MS = Number(process.env.CLAWCODEX_DEV_PERF_MS ?? '2') || 0
-const LOG_PATH = process.env.CLAWCODEX_DEV_PERF_LOG?.trim() || appHomePath('perf.log')
+const ENABLED = /^(?:1|true|yes|on)$/i.test((process.env.DSH_CCTUI_DEV_PERF ?? '').trim())
+const THRESHOLD_MS = Number(process.env.DSH_CCTUI_DEV_PERF_MS ?? '2') || 0
+const LOG_PATH = process.env.DSH_CCTUI_DEV_PERF_LOG?.trim() || appHomePath('perf.log')
 
 let logReady = false
 

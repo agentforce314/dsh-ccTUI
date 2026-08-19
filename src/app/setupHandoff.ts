@@ -1,4 +1,4 @@
-import type { RunExternalProcess } from '@clawcodex/ink'
+import type { RunExternalProcess } from '@dsh-cctui/ink'
 
 import type { SetupStatusResponse } from '../gatewayTypes.js'
 import type { LaunchResult } from '../lib/externalCli.js'

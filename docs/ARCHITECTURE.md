@@ -16,7 +16,7 @@
 │            │          import @deepseek-ai/*)                       │
 │        src/app/…  src/components/…  src/lib/…  src/domain/…        │
 │            (copied from clawcodex ui-tui, backend-agnostic)        │
-│        packages/clawcodex-ink  (forked Ink renderer, vendored)     │
+│        packages/dsh-cctui-ink  (forked Ink renderer, vendored)     │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -97,7 +97,7 @@ dsh-cctui/
 ├── cordis.patch.yml        # real install path: config overrides + inserts over dsh-base
 ├── cordis.yml              # dev: full composition incl. scripted-LLM for e2e
 ├── bin/dsh-cctui.js       # launcher: profile bootstrap + skew guard (Stage 9)
-├── packages/clawcodex-ink/ # vendored fork, unchanged (file: dependency)
+├── packages/dsh-cctui-ink/ # vendored fork, unchanged (file: dependency)
 ├── src/
 │   ├── harness/            # ONLY dir importing @deepseek-ai/* (adapter boundary)
 │   │   ├── index.ts        # cordis plugin surface

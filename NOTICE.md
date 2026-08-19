@@ -6,8 +6,8 @@ This project contains material from the following MIT-licensed projects:
 
 - `ui-tui/` — the TUI application source (React app, components, hooks, domain logic, tests)
   from which most of `src/` is ported.
-- `ui-tui/packages/clawcodex-ink/` — a fork of the Ink terminal renderer, vendored here as
-  `packages/clawcodex-ink/`.
+- `ui-tui/packages/dsh-cctui-ink/` — a fork of the Ink terminal renderer, vendored here as
+  `packages/dsh-cctui-ink/`.
 
 Copyright (c) 2026 Clawd Codex Team. MIT License.
 

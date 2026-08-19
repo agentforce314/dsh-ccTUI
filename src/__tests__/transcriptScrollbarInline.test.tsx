@@ -1,6 +1,6 @@
 import { PassThrough } from 'node:stream'
 
-import { Box, renderSync, type ScrollBoxHandle, Text } from '@clawcodex/ink'
+import { Box, renderSync, type ScrollBoxHandle, Text } from '@dsh-cctui/ink'
 import React from 'react'
 import { describe, expect, it } from 'vitest'
 

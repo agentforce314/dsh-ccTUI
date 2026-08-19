@@ -38,6 +38,13 @@ an `- id: cctui` config override in the profile's `cordis.patch.yml`: `provider`
 - **Modes**: Shift+Tab cycles default → plan → bypassPermissions (mapped onto the harness
   plan-mode controller and approval policy).
 
+## Configuration
+
+Environment knobs use the `DSH_CCTUI_` prefix — e.g. `DSH_CCTUI_INLINE=0` (alternate screen
+instead of inline scrollback), `DSH_CCTUI_THEME=light|dark`, `DSH_CCTUI_HOME` (data dir,
+default `~/.dsh-cctui`), `DSH_CCTUI_FPS=1`. `CLAUDE_CODE_SCROLL_SPEED` is still honored as a
+migration fallback for people coming from Claude Code.
+
 ## Development
 
 ```sh

@@ -21,14 +21,14 @@ let dir: string | undefined
 const useTempLog = (): string => {
   dir = mkdtempSync(join(tmpdir(), 'render-debug-'))
   const file = join(dir, 'trace.log')
-  process.env.CLAWCODEX_RENDER_DEBUG_FILE = file
+  process.env.DSH_CCTUI_RENDER_DEBUG_FILE = file
 
   return file
 }
 
 afterEach(() => {
-  delete process.env.CLAWCODEX_RENDER_DEBUG
-  delete process.env.CLAWCODEX_RENDER_DEBUG_FILE
+  delete process.env.DSH_CCTUI_RENDER_DEBUG
+  delete process.env.DSH_CCTUI_RENDER_DEBUG_FILE
 
   if (dir) {
     rmSync(dir, { force: true, recursive: true })
@@ -48,7 +48,7 @@ describe('render-debug', () => {
 
   it('records the row and the two numbers that explain why it was dropped', () => {
     const file = useTempLog()
-    process.env.CLAWCODEX_RENDER_DEBUG = '1'
+    process.env.DSH_CCTUI_RENDER_DEBUG = '1'
 
     expect(renderDebugEnabled()).toBe(true)
     logDroppedRow(SAMPLE)
@@ -70,7 +70,7 @@ describe('render-debug', () => {
   // to name this one too or it points at the wrong suspect.
   it('records a wide char refused at the viewport edge', () => {
     const file = useTempLog()
-    process.env.CLAWCODEX_RENDER_DEBUG = '1'
+    process.env.DSH_CCTUI_RENDER_DEBUG = '1'
 
     logSkippedWideCell({ char: '世', viewportWidth: 80, x: 79, y: 4 })
 
@@ -82,7 +82,7 @@ describe('render-debug', () => {
     useTempLog()
 
     for (const v of ['0', 'false', '']) {
-      process.env.CLAWCODEX_RENDER_DEBUG = v
+      process.env.DSH_CCTUI_RENDER_DEBUG = v
       expect(renderDebugEnabled(), `value ${JSON.stringify(v)}`).toBe(false)
     }
   })
@@ -90,8 +90,8 @@ describe('render-debug', () => {
   // A read-only cwd or a full disk is not a rendering problem — diagnostics
   // must never be the thing that takes the UI down.
   it('swallows a write failure instead of throwing into the render loop', () => {
-    process.env.CLAWCODEX_RENDER_DEBUG = '1'
-    process.env.CLAWCODEX_RENDER_DEBUG_FILE = join(tmpdir(), 'no-such-dir-here', 'nested', 'trace.log')
+    process.env.DSH_CCTUI_RENDER_DEBUG = '1'
+    process.env.DSH_CCTUI_RENDER_DEBUG_FILE = join(tmpdir(), 'no-such-dir-here', 'nested', 'trace.log')
 
     expect(() => logDroppedRow(SAMPLE)).not.toThrow()
   })

@@ -78,7 +78,7 @@ def drive() -> list[str]:
     env = dict(os.environ)
     env["DSH_HOME"] = str(HOME)
     env["NODE_ENV"] = "production"
-    env["CLAWCODEX_TUI_INLINE"] = "1"
+    env["DSH_CCTUI_INLINE"] = "1"
     cmd = ["node", str(DSH), "--profile", "dsh-cctui", "--patch", str(PATCH)]
     master, slave = pty.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))

@@ -41,7 +41,7 @@ describe('shouldUseRichEightBitDowngradeForLegacyAppleTerminal', () => {
     ).toBe(false)
     expect(
       shouldUseRichEightBitDowngradeForLegacyAppleTerminal(
-        { CLAWCODEX_TUI_TRUECOLOR: '1', TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv,
+        { DSH_CCTUI_TRUECOLOR: '1', TERM_PROGRAM: 'Apple_Terminal' } as NodeJS.ProcessEnv,
         3
       )
     ).toBe(false)

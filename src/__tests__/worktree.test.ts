@@ -5,12 +5,12 @@ import { parseWorktreeSession, planWorktreeExit } from '../lib/worktree.js'
 const OWNER_PID = 4242
 
 const fullEnv = (overrides: Record<string, string | undefined> = {}) => ({
-  CLAWCODEX_WORKTREE_BRANCH: 'worktree-fix-auth',
-  CLAWCODEX_WORKTREE_NAME: 'fix-auth',
-  CLAWCODEX_WORKTREE_ORIGINAL_CWD: '/repo',
-  CLAWCODEX_WORKTREE_OWNER_PID: String(OWNER_PID),
-  CLAWCODEX_WORKTREE_PATH: '/repo/.clawcodex/worktrees/fix-auth',
-  CLAWCODEX_WORKTREE_REPO_ROOT: '/repo',
+  DSH_CCTUI_WORKTREE_BRANCH: 'worktree-fix-auth',
+  DSH_CCTUI_WORKTREE_NAME: 'fix-auth',
+  DSH_CCTUI_WORKTREE_ORIGINAL_CWD: '/repo',
+  DSH_CCTUI_WORKTREE_OWNER_PID: String(OWNER_PID),
+  DSH_CCTUI_WORKTREE_PATH: '/repo/.clawcodex/worktrees/fix-auth',
+  DSH_CCTUI_WORKTREE_REPO_ROOT: '/repo',
   ...overrides
 })
 
@@ -27,11 +27,11 @@ describe('parseWorktreeSession', () => {
 
   it('returns null when any var is missing', () => {
     for (const key of [
-      'CLAWCODEX_WORKTREE_NAME',
-      'CLAWCODEX_WORKTREE_PATH',
-      'CLAWCODEX_WORKTREE_BRANCH',
-      'CLAWCODEX_WORKTREE_ORIGINAL_CWD',
-      'CLAWCODEX_WORKTREE_REPO_ROOT'
+      'DSH_CCTUI_WORKTREE_NAME',
+      'DSH_CCTUI_WORKTREE_PATH',
+      'DSH_CCTUI_WORKTREE_BRANCH',
+      'DSH_CCTUI_WORKTREE_ORIGINAL_CWD',
+      'DSH_CCTUI_WORKTREE_REPO_ROOT'
     ]) {
       expect(parseWorktreeSession(fullEnv({ [key]: undefined }), OWNER_PID)).toBeNull()
     }
@@ -42,9 +42,9 @@ describe('parseWorktreeSession', () => {
     // inherits the vars but is NOT a child of that launcher — it must not
     // adopt (and at clean exit delete) a worktree it doesn't own.
     expect(parseWorktreeSession(fullEnv(), OWNER_PID + 1)).toBeNull()
-    expect(parseWorktreeSession(fullEnv({ CLAWCODEX_WORKTREE_OWNER_PID: undefined }), OWNER_PID)).toBeNull()
-    expect(parseWorktreeSession(fullEnv({ CLAWCODEX_WORKTREE_OWNER_PID: 'nope' }), OWNER_PID)).toBeNull()
-    expect(parseWorktreeSession(fullEnv({ CLAWCODEX_WORKTREE_OWNER_PID: '0' }), 0)).toBeNull()
+    expect(parseWorktreeSession(fullEnv({ DSH_CCTUI_WORKTREE_OWNER_PID: undefined }), OWNER_PID)).toBeNull()
+    expect(parseWorktreeSession(fullEnv({ DSH_CCTUI_WORKTREE_OWNER_PID: 'nope' }), OWNER_PID)).toBeNull()
+    expect(parseWorktreeSession(fullEnv({ DSH_CCTUI_WORKTREE_OWNER_PID: '0' }), 0)).toBeNull()
   })
 })
 

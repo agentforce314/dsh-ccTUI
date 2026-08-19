@@ -53,7 +53,7 @@ function resolveThresholds(criticalBytes?: number, highBytes?: number) {
   return { critical, high }
 }
 
-// Deferred @clawcodex/ink import: loading `@clawcodex/ink` at module top-level
+// Deferred @dsh-cctui/ink import: loading `@dsh-cctui/ink` at module top-level
 // pulls the full ~414KB Ink bundle (React, renderer, components, hooks) onto
 // the critical path before the Python gateway can even be spawned. That
 // serialised roughly 150ms of Node work in front of gw.start() on every
@@ -73,7 +73,7 @@ async function _ensureEvictInkCaches(): Promise<(level: 'all' | 'half') => unkno
     return _evictInkCaches
   }
 
-  _evictInkCachesPromise ??= import('@clawcodex/ink')
+  _evictInkCachesPromise ??= import('@dsh-cctui/ink')
     .then(mod => {
       _evictInkCaches = mod.evictInkCaches as (level: 'all' | 'half') => unknown
 
@@ -115,7 +115,7 @@ export function startMemoryMonitor({
   // Cooldown prevents repeated auto dumps when heap oscillates around the
   // threshold (issue #21767). `dumped` alone is not enough — it clears on
   // every transition back to `normal`.
-  const cooldownRaw = process.env.CLAWCODEX_AUTO_HEAPDUMP_COOLDOWN_MS?.trim()
+  const cooldownRaw = process.env.DSH_CCTUI_AUTO_HEAPDUMP_COOLDOWN_MS?.trim()
   const cooldownParsed = cooldownRaw ? Number(cooldownRaw) : NaN
   const cooldownMs = Number.isFinite(cooldownParsed) && cooldownParsed >= 0 ? cooldownParsed : 600_000
   let lastAutoDumpAt = 0
@@ -157,7 +157,7 @@ export function startMemoryMonitor({
 
     // Prune Ink content caches before dump/exit — half on 'high' (recoverable),
     // full on 'critical' (post-dump RSS reduction, keeps user running).
-    // Deferred import keeps `@clawcodex/ink` off the cold-start critical path;
+    // Deferred import keeps `@dsh-cctui/ink` off the cold-start critical path;
     // by the time a tick fires 10s after launch the app has already loaded
     // the same module, so this resolves instantly from the ESM cache.
     try {

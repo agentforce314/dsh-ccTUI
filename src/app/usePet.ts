@@ -1,4 +1,4 @@
-import { useStdout } from '@clawcodex/ink'
+import { useStdout } from '@dsh-cctui/ink'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { PetGrid } from '../components/petSprite.js'

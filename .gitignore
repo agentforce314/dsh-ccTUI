@@ -2,7 +2,7 @@ reference_projects/
 node_modules/
 /dist/
 /lib/
-packages/clawcodex-ink/dist/
+packages/dsh-cctui-ink/dist/
 *.tsbuildinfo
 .dsh-dev-home/
 *.log

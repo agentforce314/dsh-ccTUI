@@ -187,7 +187,7 @@ describe('supportsFastEchoTerminal', () => {
     expect(
       supportsFastEchoTerminal({
         TMUX: '/tmp/tmux-1000/default,1234,0',
-        CLAWCODEX_TUI_TERMUX_FAST_ECHO: '1',
+        DSH_CCTUI_TERMUX_FAST_ECHO: '1',
         TERMUX_VERSION: '0.118.0'
       } as NodeJS.ProcessEnv)
     ).toBe(false)
@@ -227,7 +227,7 @@ describe('supportsFastEchoTerminal', () => {
   it('allows explicit Termux fast-echo opt-in via env override', () => {
     expect(
       supportsFastEchoTerminal({
-        CLAWCODEX_TUI_TERMUX_FAST_ECHO: '1',
+        DSH_CCTUI_TERMUX_FAST_ECHO: '1',
         TERMUX_VERSION: '0.118.0'
       } as NodeJS.ProcessEnv)
     ).toBe(true)

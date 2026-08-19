@@ -8,7 +8,7 @@ Reference material (gitignored, vendored locally under `reference_projects/`):
 
 | Project | Role |
 |---|---|
-| `reference_projects/clawcodex/ui-tui` | The TUI to port: ~41k LOC React app + ~29k LOC forked Ink renderer (`packages/clawcodex-ink`). MIT. |
+| `reference_projects/clawcodex/ui-tui` | The TUI to port: ~41k LOC React app + ~29k LOC forked Ink renderer (`packages/dsh-cctui-ink`). MIT. |
 | `reference_projects/dsh-TUI` | A proven claude-code-style TUI plugin for deepseek-harness; we borrow its packaging skeleton and integration patterns. MIT. |
 | `reference_projects/deepseek-harness` | The harness itself (docs + source). Published on npm as `@deepseek-ai/*@0.1.0-rc.7`. |
 
@@ -58,7 +58,7 @@ Acceptance: docs merged to `main`.
 ### Stage 2 — Toolchain + vendored Ink fork
 - Root `package.json` (`dsh-cctui`, ESM, React 19, `file:` dep on the fork), `tsconfig.json`,
   `vitest.config.ts`, CI workflow (typecheck + vitest).
-- Vendor `packages/clawcodex-ink` unchanged (esbuild build, root `index.js` shims).
+- Vendor `packages/dsh-cctui-ink` unchanged (esbuild build, root `index.js` shims).
 - Acceptance: fork builds; its own unit tests pass; a headless `renderSync` smoke test renders
   Box/Text into a fake stdout; CI green.
 

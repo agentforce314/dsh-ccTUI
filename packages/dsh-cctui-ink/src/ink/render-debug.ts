@@ -14,11 +14,11 @@
  *      prev === next on the following frame and nothing ever repaints it —
  *      permanent divergence at the right edge, showing as a MISSING glyph.
  *
- * Set CLAWCODEX_RENDER_DEBUG=1 to record both. Output goes to a FILE, never
+ * Set DSH_CCTUI_RENDER_DEBUG=1 to record both. Output goes to a FILE, never
  * stdout — writing a diagnostic to the terminal being diagnosed would be its
  * own foreign write. Defaults to clawcodex-render-debug.log in the system temp
  * directory (not the cwd, which would drop it into the user's repo mid-debug);
- * override with CLAWCODEX_RENDER_DEBUG_FILE.
+ * override with DSH_CCTUI_RENDER_DEBUG_FILE.
  */
 
 import { appendFileSync } from 'fs'
@@ -26,12 +26,12 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 
 const enabled = (): boolean => {
-  const v = process.env.CLAWCODEX_RENDER_DEBUG
+  const v = process.env.DSH_CCTUI_RENDER_DEBUG
 
   return !!v && v !== '0' && v !== 'false'
 }
 
-const target = (): string => process.env.CLAWCODEX_RENDER_DEBUG_FILE || join(tmpdir(), 'clawcodex-render-debug.log')
+const target = (): string => process.env.DSH_CCTUI_RENDER_DEBUG_FILE || join(tmpdir(), 'clawcodex-render-debug.log')
 
 /** True when tracing is on. Read ONCE per frame — this is a process.env lookup
  *  (~190ns), far too slow for the per-cell diff path. */

@@ -1,4 +1,4 @@
-import { AlternateScreen, Box, NoSelect, ScrollBox, Text } from '@clawcodex/ink'
+import { AlternateScreen, Box, NoSelect, ScrollBox, Text } from '@dsh-cctui/ink'
 import { useStore } from '@nanostores/react'
 import { Fragment, memo, useMemo, useRef } from 'react'
 

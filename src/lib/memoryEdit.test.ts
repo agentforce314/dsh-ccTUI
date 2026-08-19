@@ -20,7 +20,7 @@ describe('ensureMemoryFile', () => {
   })
 
   it('creates the config home and file for the user memory target', () => {
-    const path = join(home, '.dsh-cctui', 'CLAWCODEX.md')
+    const path = join(home, '.dsh-cctui', 'DSH-CCTUI.md')
 
     ensureMemoryFile(path, home)
 
@@ -28,7 +28,7 @@ describe('ensureMemoryFile', () => {
   })
 
   it('preserves existing content (exclusive create swallows EEXIST)', () => {
-    const path = join(home, 'CLAWCODEX.md')
+    const path = join(home, 'DSH-CCTUI.md')
 
     writeFileSync(path, 'precious')
     ensureMemoryFile(path, home)
@@ -37,7 +37,7 @@ describe('ensureMemoryFile', () => {
   })
 
   it('propagates non-EEXIST errors (missing dir outside the config home)', () => {
-    expect(() => ensureMemoryFile(join(home, 'nope', 'CLAWCODEX.md'), home)).toThrow()
+    expect(() => ensureMemoryFile(join(home, 'nope', 'DSH-CCTUI.md'), home)).toThrow()
   })
 })
 
@@ -63,14 +63,14 @@ describe('editorHint', () => {
 
 describe('relativeMemoryPath', () => {
   it('prefers the shorter of ~ and ./ spellings', () => {
-    expect(relativeMemoryPath('/home/u/w/CLAWCODEX.md', '/home/u/w', '/home/u')).toBe('./CLAWCODEX.md')
-    expect(relativeMemoryPath('/home/u/.clawcodex/CLAWCODEX.md', '/home/u/deep/nested/dir', '/home/u')).toBe(
-      '~/.clawcodex/CLAWCODEX.md'
+    expect(relativeMemoryPath('/home/u/w/DSH-CCTUI.md', '/home/u/w', '/home/u')).toBe('./DSH-CCTUI.md')
+    expect(relativeMemoryPath('/home/u/.dsh-cctui/DSH-CCTUI.md', '/home/u/deep/nested/dir', '/home/u')).toBe(
+      '~/.dsh-cctui/DSH-CCTUI.md'
     )
   })
 
   it('falls back to the absolute path outside home and cwd', () => {
-    expect(relativeMemoryPath('/etc/CLAWCODEX.md', '/home/u/w', '/home/u')).toBe('/etc/CLAWCODEX.md')
+    expect(relativeMemoryPath('/etc/DSH-CCTUI.md', '/home/u/w', '/home/u')).toBe('/etc/DSH-CCTUI.md')
   })
 })
 
@@ -129,7 +129,7 @@ describe('openMemoryFileInEditor', () => {
 
   it('creates the file, spawns inside the suspend, notifies, and reports', async () => {
     const d = deps()
-    const path = join(cwd, 'CLAWCODEX.md')
+    const path = join(cwd, 'DSH-CCTUI.md')
 
     await openMemoryFileInEditor(path, d)
 
@@ -139,14 +139,14 @@ describe('openMemoryFileInEditor', () => {
       `spawn:vim ${path}`,
       'suspend:exit',
       'notify',
-      `sys:Opened memory file at ./CLAWCODEX.md\n\n${editorHint({ EDITOR: 'vim' })}`
+      `sys:Opened memory file at ./DSH-CCTUI.md\n\n${editorHint({ EDITOR: 'vim' })}`
     ])
   })
 
   it('reports a launch failure and skips the edited notification', async () => {
     const d = deps({ spawn: vi.fn(() => ({ error: new Error('ENOENT') })) })
 
-    await openMemoryFileInEditor(join(cwd, 'CLAWCODEX.md'), d)
+    await openMemoryFileInEditor(join(cwd, 'DSH-CCTUI.md'), d)
 
     expect(d.notifyEdited).not.toHaveBeenCalled()
     expect(d.sys).toHaveBeenCalledWith('Error opening memory file: Error: ENOENT')
@@ -155,7 +155,7 @@ describe('openMemoryFileInEditor', () => {
   it('reports ensure-create failures without spawning', async () => {
     const d = deps()
 
-    await openMemoryFileInEditor(join(cwd, 'missing-dir', 'CLAWCODEX.md'), d)
+    await openMemoryFileInEditor(join(cwd, 'missing-dir', 'DSH-CCTUI.md'), d)
 
     expect(d.spawn).not.toHaveBeenCalled()
     expect(d.sys.mock.calls[0]?.[0]).toMatch(/^Error opening memory file: /)

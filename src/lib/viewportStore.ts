@@ -1,4 +1,4 @@
-import type { ScrollBoxHandle } from '@clawcodex/ink'
+import type { ScrollBoxHandle } from '@dsh-cctui/ink'
 import type { RefObject } from 'react'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 

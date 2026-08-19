@@ -1,6 +1,6 @@
-// FPS counter overlay (CLAWCODEX_TUI_FPS=1). Zero-cost when disabled.
+// FPS counter overlay (DSH_CCTUI_FPS=1). Zero-cost when disabled.
 
-import { Text } from '@clawcodex/ink'
+import { Text } from '@dsh-cctui/ink'
 import { useStore } from '@nanostores/react'
 
 import { SHOW_FPS } from '../config/env.js'

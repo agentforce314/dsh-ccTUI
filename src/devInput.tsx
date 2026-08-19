@@ -10,7 +10,7 @@
  *       type a line, Enter to submit, hold BACKSPACE to test latency,
  *       Ctrl+C or Esc to quit.
  */
-import { Box, render, Text, useApp, useInput } from '@clawcodex/ink'
+import { Box, render, Text, useApp, useInput } from '@dsh-cctui/ink'
 import { useState } from 'react'
 
 import { TextInput } from './components/textInput.js'

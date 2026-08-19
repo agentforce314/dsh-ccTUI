@@ -9,7 +9,7 @@
  * accept-edits violet / bypass red / auto amber) and the voice indicator when
  * active. Everything hides while the input has text (suppressHint).
  */
-import { Box, Text } from '@clawcodex/ink'
+import { Box, Text } from '@dsh-cctui/ink'
 import { memo } from 'react'
 
 import { useTurnSelector } from '../app/turnStore.js'

@@ -8,7 +8,7 @@
  * same accumulators /cost prints, subagents included, restored on /resume);
  * the turn count is the server's `session_turns` odometer.
  */
-import { stringWidth } from '@clawcodex/ink'
+import { stringWidth } from '@dsh-cctui/ink'
 
 import { shortCwd } from '../domain/paths.js'
 import type { CostSnapshot } from '../gatewayTypes.js'

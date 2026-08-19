@@ -90,7 +90,7 @@ export async function mountCcTui(ctx: Context, config: Config): Promise<void> {
 
   process.on('beforeExit', () => stopMemoryMonitor())
 
-  const [ink, { App }] = await Promise.all([import('@clawcodex/ink'), import('../App.js')])
+  const [ink, { App }] = await Promise.all([import('@dsh-cctui/ink'), import('../App.js')])
 
   const instance = await ink.render(createElement(App, { gw }), {
     exitOnCtrlC: false,

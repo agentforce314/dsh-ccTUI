@@ -76,8 +76,8 @@ class TuiSession:
         env = dict(os.environ)
         env["DSH_HOME"] = str(HOME)
         env["NODE_ENV"] = "production"
-        env["CLAWCODEX_TUI_INLINE"] = "1"
-        env.pop("CLAWCODEX_TUI_THEME", None)
+        env["DSH_CCTUI_INLINE"] = "1"
+        env.pop("DSH_CCTUI_THEME", None)
         cmd = [
             "node",
             str(ROOT / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js"),

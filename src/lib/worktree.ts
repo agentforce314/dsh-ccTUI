@@ -2,11 +2,11 @@
  * Session worktree (--worktree) client support.
  *
  * The Python launcher creates/resumes the worktree BEFORE spawning this TUI
- * and advertises it via CLAWCODEX_WORKTREE_* env vars (the same block the
+ * and advertises it via DSH_CCTUI_WORKTREE_* env vars (the same block the
  * agent-server child inherits to service the exit-time git ops). Keep the
  * var names in sync with src/utils/worktree_session.py.
  *
- * Ownership gate: the launcher stamps CLAWCODEX_WORKTREE_OWNER_PID with its
+ * Ownership gate: the launcher stamps DSH_CCTUI_WORKTREE_OWNER_PID with its
  * own pid, and this TUI is spawned as its DIRECT child — so a session is only
  * honored when process.ppid matches. A dev-mode `node dist/entry.js` run
  * inside someone else's worktree session (stale/leaked env) fails the gate
@@ -41,17 +41,17 @@ export function parseWorktreeSession(
   env: Record<string, string | undefined>,
   ppid: number
 ): null | WorktreeSessionInfo {
-  const name = env.CLAWCODEX_WORKTREE_NAME
-  const path = env.CLAWCODEX_WORKTREE_PATH
-  const branch = env.CLAWCODEX_WORKTREE_BRANCH
-  const originalCwd = env.CLAWCODEX_WORKTREE_ORIGINAL_CWD
-  const repoRoot = env.CLAWCODEX_WORKTREE_REPO_ROOT
+  const name = env.DSH_CCTUI_WORKTREE_NAME
+  const path = env.DSH_CCTUI_WORKTREE_PATH
+  const branch = env.DSH_CCTUI_WORKTREE_BRANCH
+  const originalCwd = env.DSH_CCTUI_WORKTREE_ORIGINAL_CWD
+  const repoRoot = env.DSH_CCTUI_WORKTREE_REPO_ROOT
 
   if (!name || !path || !branch || !originalCwd || !repoRoot) {
     return null
   }
 
-  const ownerPid = Number(env.CLAWCODEX_WORKTREE_OWNER_PID ?? '')
+  const ownerPid = Number(env.DSH_CCTUI_WORKTREE_OWNER_PID ?? '')
 
   if (!Number.isInteger(ownerPid) || ownerPid <= 0 || ownerPid !== ppid) {
     return null
