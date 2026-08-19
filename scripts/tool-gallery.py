@@ -67,6 +67,10 @@ SCENARIOS: dict[str, object] = {
         'PROBE bash {"command": "echo escalated", "description": "an escalating echo",'
         ' "sandbox_permissions": "danger-full-access", "justification": "the gallery needs the approval box"}'
     ),
+    # a failure whose output overruns the row's safety cap
+    "bash_fail_long": (
+        'PROBE bash {"command": "seq 1 40 >&2; exit 1", "description": "a noisy failure"}'
+    ),
     "bash_fail": 'PROBE bash {"command": "ls /no/such/dir", "description": "failing ls"}',
     "write": 'PROBE write {"file_path": "e2e-scratch/gallery-write.txt", "content": "alpha\\nbeta\\ngamma\\n"}',
     # the harness refuses to edit a file this session has not observed, so the
@@ -98,6 +102,12 @@ SCENARIOS: dict[str, object] = {
         'PROBE workflow {"script": "log(\\"hello from the workflow\\")\\nreturn { ok: true }",'
         ' "meta": {"name": "gap-probe", "description": "a one-line workflow that returns immediately"}}'
     ),
+    "subagent_fork": (
+        'PROBE subagent_fork {"description": "Check the fork path", "prompt": "Say ok and stop."}'
+    ),
+    "job_kill": 'PROBE job_kill {"job_id": "no-such-job", "reason": "gallery probe"}',
+    "interrupt_agent": 'PROBE interrupt_agent {}',
+    "update_goal": 'PROBE update_goal {"goal_id": "no-such-goal", "revision": 1, "action": "complete"}',
     "skill": 'PROBE skill {"name": "nonexistent-skill"}',
     "read_image": 'PROBE read_image {"file_path": "e2e-scratch/gallery.png"}',
     # this one insists on an absolute path
@@ -126,6 +136,12 @@ SCENARIOS: dict[str, object] = {
         ' {"content": "second task", "status": "pending"}]}'
     ),
 }
+
+
+# Scenarios that deliberately park on a prompt — the approval box, the plan
+# review — never settle on their own, so a no-argument sweep would sit through
+# the idle timeout for each. Name them explicitly (with --live) to capture them.
+LIVE_ONLY = {"bash_escalate", "exit_plan_mode"}
 
 
 def bootstrap() -> None:
@@ -299,6 +315,12 @@ def capture(scenario: str, expand: bool, live: float | None = None) -> str | Non
         for index, prompt in enumerate(prompts):
             session.send(prompt.encode())
             session.pump(0.8)
+            if prompt.startswith("/"):
+                # a slash word opens the completion menu, whose Enter ACCEPTS
+                # rather than submits; Esc dismisses it first (nothing is
+                # running yet, so Esc cannot interrupt a turn here)
+                session.send(b"\x1b")
+                session.pump(0.4)
             session.send(b"\r")
             session.wait_for(TOOL_GLYPH, 60)
             if live is not None and index == len(prompts) - 1:
@@ -334,7 +356,7 @@ def main() -> int:
     outdir.mkdir(parents=True, exist_ok=True)
     bootstrap()
 
-    for scenario in args.scenarios or list(SCENARIOS):
+    for scenario in args.scenarios or [name for name in SCENARIOS if name not in LIVE_ONLY]:
         shot = capture(scenario, args.expand, args.live)
         if shot is None:
             continue

@@ -50,8 +50,17 @@ describe('buildToolTrailLine', () => {
     const line = buildToolTrailLine('Bash', 'x', false, big)
     const detail = parseToolTrailResultLine(line)!.detail
 
-    expect(detail.split('\n')).toHaveLength(13) // 12 + trailing …
-    expect(detail.endsWith('…')).toBe(true)
+    // 12 kept + a marker that says how much went, not a bare … that reads as
+    // "a bit more" whether three lines were dropped or three hundred
+    expect(detail.split('\n')).toHaveLength(13)
+    expect(detail.endsWith('… +28 lines')).toBe(true)
+  })
+
+  it('reads the truncation marker in the singular when one line went', () => {
+    const big = Array.from({ length: 13 }, (_, i) => `l${i}`).join('\n')
+    const detail = parseToolTrailResultLine(buildToolTrailLine('Bash', 'x', false, big))!.detail
+
+    expect(detail.endsWith('… +1 line')).toBe(true)
   })
 
   it('anchors the call/detail split so args containing :: cannot mis-split', () => {

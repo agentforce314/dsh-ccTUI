@@ -56,11 +56,17 @@ an `- id: cctui` config override in the profile's `cordis.patch.yml`: `provider`
 
 - **Conversation loop**: streamed deltas render live; reasoning behind Ctrl+O/Ctrl+R density
   toggles; busy verbs and spinners; Esc interrupts (Ctrl+C never kills the app).
-- **Tools**: Claude-style `⏺ Tool(args)` / `⎿ result` trail; write/edit diffs render as
-  structured diff cards; sandbox-escalation approvals pop the approval box (`1` approve /
-  `2`+Enter deny); todo lists pin under the busy line.
+- **Tools**: Claude-style `⏺ Tool(args)` / `⎿ result` trail, each result summarised the way
+  the original does it — `Read 3 lines`, `Found 37 files`, `Received 1.2KB (200 OK)`,
+  `Did 1 search in 2s` — with a failed call carrying the tool's own message and a running one
+  its own clock; write/edit diffs render as structured diff cards; sandbox-escalation
+  approvals pop the approval box (`1` approve / `2`+Enter deny); todo lists pin under the
+  busy line.
+- **Subagents**: a delegation reads `⏺ Subagent(Review the diff)` / `⎿ Done (2 tool uses ·
+  1.2k tokens · 11s)`, and its children stream into `/agents` — goal, live tool calls,
+  tokens, spawn tree.
 - **Sessions**: `/sessions` (Ctrl+X) lists live and persisted sessions; `/resume <id>`
-  replays a persisted transcript; `/new`, `/title`, `/rename`.
+  replays a persisted transcript, tool results and all; `/new`, `/title`, `/rename`.
 - **Commands**: every harness `ctx.commands` entry (e.g. `/plan`, `/goal`) appears in the
   completion menu and dispatches through the harness; `/model` opens the picker backed by
   the llm catalog; `/effort`, `/context`, `/usage`, `/help`, `/status`.

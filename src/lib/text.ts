@@ -220,8 +220,15 @@ export const buildToolTrailLine = (
   const raw = (note ?? '').trim()
   const lines = raw.split('\n')
 
-  const detail = (lines.length > TRAIL_DETAIL_MAX_LINES
-    ? [...lines.slice(0, TRAIL_DETAIL_MAX_LINES), '…']
+  // A bare `…` says something was cut without saying how much, which reads as
+  // "a bit more" whether three lines went or three hundred. Upstream's own
+  // truncation marker counts what it dropped, and so does the verbose block
+  // below; this now matches them. Deliberately NOT "(ctrl+o to expand)": a
+  // result the gateway retained no raw copy of expands to the same truncated
+  // text, and pointing at a key that changes nothing is worse than silence.
+  const dropped = lines.length - TRAIL_DETAIL_MAX_LINES
+  const detail = (dropped > 0
+    ? [...lines.slice(0, TRAIL_DETAIL_MAX_LINES), `… +${fmtK(dropped)} ${dropped === 1 ? 'line' : 'lines'}`]
     : lines
   )
     .join('\n')
