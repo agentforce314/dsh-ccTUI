@@ -54,6 +54,11 @@ npm run e2e                      # PTY e2e against a real dsh boot + scripted LL
 npm run e2e:install              # the real `dsh plugin add` install path
 ```
 
+### Versioning
+
+Each shipped change bumps the **patch** digit by 0.0.1 — `0.3.0` → `0.3.1` → `0.3.2`. Bump
+`package.json` in the change's own commit, then tag `v<version>` on `main` after it merges.
+
 Architecture and porting details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 [docs/PLAN.md](docs/PLAN.md), [docs/PORTING-NOTES.md](docs/PORTING-NOTES.md). The adapter
 boundary (`src/harness/` is the only place that may import `@deepseek-ai/*`) is CI-gated.
