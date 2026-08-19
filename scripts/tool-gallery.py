@@ -62,6 +62,11 @@ SCENARIOS: dict[str, object] = {
         'PROBE bash {"command": "for i in 1 2 3 4 5 6 7 8; do echo line-$i; sleep 1; done",'
         ' "description": "print 8 lines with a 1s delay"}'
     ),
+    # a sandbox escalation, which pops the approval box (pair with --live)
+    "bash_escalate": (
+        'PROBE bash {"command": "echo escalated", "description": "an escalating echo",'
+        ' "sandbox_permissions": "danger-full-access", "justification": "the gallery needs the approval box"}'
+    ),
     "bash_fail": 'PROBE bash {"command": "ls /no/such/dir", "description": "failing ls"}',
     "write": 'PROBE write {"file_path": "e2e-scratch/gallery-write.txt", "content": "alpha\\nbeta\\ngamma\\n"}',
     # the harness refuses to edit a file this session has not observed, so the
