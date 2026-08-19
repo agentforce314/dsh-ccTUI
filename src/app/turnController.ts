@@ -992,13 +992,21 @@ class TurnController {
 
     // Expanded-details sibling: full Args/Result blocks whenever the gateway
     // retained raw output the compact summary lost ('' = nothing to expand).
+    //
+    // The Args block is dropped when it only restates the row's own header —
+    // `⏺ Read(src/a.ts)` followed by `Args: src/a.ts` is two lines saying one
+    // thing, and the expanded view is where a reader goes to see MORE. It
+    // survives whenever the arguments carry something the header dropped: a
+    // shell call's description, a write's file content.
+    const verboseArgs = done?.verboseArgs?.trim() === (done?.context || '').trim() ? undefined : done?.verboseArgs
+
     this.lastVerboseLine = rawText
       ? buildVerboseToolTrailLine(
           name,
           done?.context || '',
           Boolean(error),
           duration ?? fallbackDuration,
-          done?.verboseArgs,
+          verboseArgs,
           rawText
         )
       : ''
