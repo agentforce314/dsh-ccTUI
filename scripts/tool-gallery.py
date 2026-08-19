@@ -58,10 +58,13 @@ SCENARIOS: dict[str, object] = {
     "glob": 'PROBE glob {"pattern": "src/components/*.tsx"}',
     "bash": 'PROBE bash {"command": "ls -1 src | head -12", "description": "list src"}',
     "bash_fail": 'PROBE bash {"command": "ls /no/such/dir", "description": "failing ls"}',
-    "write": 'PROBE write {"file_path": "e2e-scratch/gallery.txt", "content": "alpha\\nbeta\\ngamma\\n"}',
+    "write": 'PROBE write {"file_path": "e2e-scratch/gallery-write.txt", "content": "alpha\\nbeta\\ngamma\\n"}',
+    # the harness refuses to edit a file this session has not observed, so the
+    # scenario writes it, reads it, then edits it
     "edit": [
-        'PROBE write {"file_path": "e2e-scratch/gallery.txt", "content": "alpha\\nbeta\\ngamma\\n"}',
-        'PROBE edit {"file_path": "e2e-scratch/gallery.txt", "old_string": "beta", "new_string": "BETA-changed"}',
+        'PROBE write {"file_path": "e2e-scratch/gallery-edit.txt", "content": "alpha\\nbeta\\ngamma\\n"}',
+        'PROBE read {"file_path": "e2e-scratch/gallery-edit.txt"}',
+        'PROBE edit {"file_path": "e2e-scratch/gallery-edit.txt", "old_string": "beta", "new_string": "BETA-changed"}',
     ],
     # reaches the network on purpose — the fetch card is a retrieval summary
     "web_fetch": 'PROBE web_fetch {"url": "https://example.com"}',
@@ -83,7 +86,8 @@ SCENARIOS: dict[str, object] = {
     ),
     "skill": 'PROBE skill {"name": "nonexistent-skill"}',
     "read_image": 'PROBE read_image {"file_path": "e2e-scratch/gallery.png"}',
-    "str_replace_editor": 'PROBE str_replace_editor {"command": "view", "path": "src/domain/usage.ts"}',
+    # this one insists on an absolute path
+    "str_replace_editor": ('PROBE str_replace_editor {"command": "view", "path": "%s/src/domain/usage.ts"}' % ROOT),
     "job_output": 'PROBE job_output {"job_id": "no-such-job"}',
     "send_message": 'PROBE send_message {"subagent_id": "no-such-agent", "message": "hello"}',
     "get_goal": 'PROBE get_goal {}',
@@ -111,6 +115,9 @@ SCENARIOS: dict[str, object] = {
 
 
 def bootstrap() -> None:
+    # the mutation scenarios must CREATE their file, not find yesterday's
+    for leftover in (ROOT / "e2e-scratch").glob("gallery-*.txt"):
+        leftover.unlink()
     PROFILE.mkdir(parents=True, exist_ok=True)
     (PROFILE / "package.json").write_text(
         json.dumps(

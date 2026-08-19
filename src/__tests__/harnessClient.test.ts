@@ -51,7 +51,10 @@ const TOOL_CARDS: Record<string, unknown> = {
     path: 'src/y.ts',
     totalLines: 40
   },
-  write: { card: 'diff', diffs: [{ newText: 'line one\nline two\n', oldText: null, path: 'notes.txt' }] }
+  write: { card: 'diff', diffs: [{ newText: 'line one\nline two\n', oldText: null, path: 'notes.txt' }] },
+  // an APPLIED HUNK rather than a whole file: it stops mid-file, so neither
+  // side carries a trailing newline
+  write_hunk: { card: 'diff', diffs: [{ newText: 'beta\nBETA', oldText: 'beta\nbeta', path: 'notes.txt' }] }
 }
 
 function makeWorld() {
@@ -1022,6 +1025,16 @@ describe('HarnessGatewayClient', () => {
     expect(usage.context_used).toBe(3200)
     expect(usage.context_max).toBe(64000)
     expect(usage.context_percent).toBe(5)
+  })
+
+  it('drops the no-newline marker a hunk-shaped diff always produces', async () => {
+    const done = await runTool('write_hunk', '{"file_path":"notes.txt"}')
+    const lines = done.payload.structured_diff?.hunks.flatMap(hunk => hunk.lines) ?? []
+
+    // the row renderer has no marker for `\ No newline at end of file`, so it
+    // came out as a phantom context line numbered one past the end
+    expect(lines.length).toBeGreaterThan(0)
+    expect(lines.some(line => line.startsWith('\\'))).toBe(false)
   })
 
   it('converts diff presentation views into structured_diff payloads', async () => {
