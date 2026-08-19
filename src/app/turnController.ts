@@ -125,13 +125,26 @@ const hasDetails = (msg: Msg): boolean => Boolean(msg.thinking || msg.tools?.len
 const isTodoStatus = (status: unknown): status is TodoItem['status'] =>
   status === 'pending' || status === 'in_progress' || status === 'completed' || status === 'cancelled'
 
+/**
+ * A checklist write, from whichever backend sent it, into the rows the pinned
+ * HUD draws.
+ *
+ * The id is synthesized when the backend does not carry one. Upstream's todos
+ * are identified rows (TaskV2 mutates them one at a time and needs to name
+ * which), so this required an id and dropped anything without one — which is
+ * every todo deepseek-harness writes, since its `todo/write` replaces the WHOLE
+ * list and its items are just `{content, status}`. The list arrived, every row
+ * failed the filter, and the HUD silently rendered nothing at all. The id is
+ * only a React key here, and a whole-list write makes the position a stable
+ * one.
+ */
 const parseTodos = (value: unknown): null | TodoItem[] => {
   if (!Array.isArray(value)) {
     return null
   }
 
   return value
-    .map(item => {
+    .map((item, index) => {
       if (!item || typeof item !== 'object') {
         return null
       }
@@ -148,11 +161,11 @@ const parseTodos = (value: unknown): null | TodoItem[] => {
       return {
         ...(activeForm && { activeForm }),
         content: String(row.content ?? '').trim(),
-        id: String(row.id ?? '').trim(),
+        id: String(row.id ?? '').trim() || `todo-${index}`,
         status
       }
     })
-    .filter((item): item is TodoItem => Boolean(item?.id && item.content))
+    .filter((item): item is TodoItem => Boolean(item?.content))
 }
 
 const textSegments = (segments: Msg[]) =>
