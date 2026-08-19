@@ -40,6 +40,14 @@ describe('toolArgsPreview', () => {
     )
   })
 
+  it('labels a delegation by its description, not the brief it was handed', () => {
+    const raw = '{"description":"Review the diff","prompt":"Summarise what changed in src/ and stop.","run_in_background":false}'
+
+    // upstream renders `⏺ Task(Review the diff)`; a delegation's prompt is bulk
+    // the same way a write's content is
+    expect(toolArgsPreview(raw)).toBe('Review the diff')
+  })
+
   it('falls back to the unfiltered projection when every argument is bulk', () => {
     expect(toolArgsPreview('{"todos":[{"content":"a","status":"pending"}]}')).toBe(
       'todos: [{"content":"a","status":"pending"}]'
