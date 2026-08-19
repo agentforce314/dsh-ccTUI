@@ -74,7 +74,7 @@ function makeWorld() {
   const storedEvents = [
     { data: { content: [{ text: 'old prompt', type: 'text' }], id: 'u1', role: 'user', source: { kind: 'user' } }, seq: 1, time: 1, type: 'user/message' },
     { data: { arguments: '{"command":"ls"}', callId: 'c1', name: 'bash', step: 1, turn: 1 }, seq: 2, time: 2, type: 'tool/call' },
-    { data: { message: { content: [{ text: 'old reply', type: 'text' }], id: 'a1', role: 'assistant', source: { kind: 'model' } }, step: 1, turn: 1 }, seq: 3, time: 3, type: 'assistant/message' },
+    { data: { message: { content: [{ text: 'old reply', type: 'text' }], id: 'a1', role: 'assistant', source: { kind: 'model' } }, step: 1, turn: 1, usage: { cacheReadTokens: 100, inputTokens: 900, outputTokens: 120 } }, seq: 3, time: 3, type: 'assistant/message' },
     { data: { reason: { kind: 'completed' }, turn: 1 }, seq: 4, time: 4, type: 'turn/end' }
   ]
   const resumedAgent = {
@@ -895,6 +895,34 @@ describe('HarnessGatewayClient', () => {
     // the binding switched: submissions now reach the resumed agent
     await w.client.request('prompt.submit', { text: 'next' })
     expect(w.resumedAgent.followup).toHaveBeenCalledTimes(1)
+  })
+
+  it('replays the stored log\'s token accounting so a resume does not restart at zero', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+
+    // Before: this binding has run no steps of its own.
+    await expect(w.client.request('session.usage', {})).resolves.toMatchObject({ calls: 0, input: 0, output: 0, total: 0 })
+
+    w.events.length = 0
+    await w.client.request('session.resume', { session_id: 'cc-resumed-1' })
+
+    // The log's one priced step, cache reads folded into input — the same
+    // arithmetic live counting does, because both go through foldUsage.
+    await expect(w.client.request('session.usage', {})).resolves.toMatchObject({
+      calls: 1,
+      input: 1000,
+      output: 120,
+      total: 1120
+    })
+
+    // …and it rides the stats refresh, so the line is right immediately
+    // rather than a whole turn later.
+    const stats = w.events.find(ev => ev.type === 'session.stats')
+
+    expect(stats?.payload).toMatchObject({ session_turns: 1, usage: { input: 1000, output: 120 } })
   })
 
   it('session.active_list reflects live agents and the current binding', async () => {

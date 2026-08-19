@@ -1135,6 +1135,42 @@ describe('createGatewayEventHandler', () => {
     expect(getTurnState().activity.filter(a => a.text.includes('/agents'))).toHaveLength(0)
   })
 
+  it('keeps a tool that was still running when the interrupt landed', () => {
+    // Upstream renders `⏺ Bash(find / -name …)` over `⎿ Interrupted · What
+    // should Claude do instead?` — the one row that says what was cut off
+    // mid-flight. Dropping it left the transcript with no record of it at all.
+    vi.useFakeTimers()
+
+    try {
+      const appended: Msg[] = []
+      const ctx = buildCtx(appended)
+      ctx.gateway.gw.request = vi.fn(async () => ({ status: 'interrupted' }))
+      const onEvent = createGatewayEventHandler(ctx)
+
+      patchUiState({ sid: 'sess-1' })
+      onEvent({ payload: {}, type: 'message.start' } as any)
+      onEvent({ payload: { context: 'sleep 30', name: 'bash', tool_id: 't-1' }, type: 'tool.start' } as any)
+
+      turnController.interruptTurn({
+        appendMessage: (msg: Msg) => appended.push(msg),
+        gw: ctx.gateway.gw,
+        sid: 'sess-1',
+        sys: ctx.system.sys
+      })
+
+      const shelf = appended.find(msg => msg.tools?.length)
+
+      expect(shelf?.tools?.[0]).toContain('Bash(sleep 30)')
+      expect(shelf?.tools?.[0]).toContain('Interrupted · What should dsh-ccTUI do instead?')
+      // …and the note is not ALSO the reply, three lines below itself
+      expect(appended.filter(msg => /\S/.test(msg.text) && msg.text.includes('Interrupted ·'))).toHaveLength(0)
+
+      vi.runAllTimers()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('drops stale reasoning/tool/todos events after ctrl-c until the next message starts', () => {
     // Repro for the discord report: ctrl-c interrupts, but late reasoning/tool
     // events from the still-winding-down agent loop kept populating the UI for

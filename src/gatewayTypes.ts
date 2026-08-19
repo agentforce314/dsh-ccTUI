@@ -907,8 +907,14 @@ export type GatewayEvent =
       type: 'message.complete'
     }
   /** Out-of-band stats-line refresh: /clear and /resume replies carry the
-   *  odometer + totals so the line is right before any turn completes. */
-  | { payload: { cost?: CostSnapshot; session_turns?: number }; session_id?: string; type: 'session.stats' }
+   *  odometer + totals so the line is right before any turn completes.
+   *  `usage` is the price-free backend's equivalent of `cost` (see
+   *  foldSessionStats) — a resumed session rebuilds both from its log. */
+  | {
+      payload: { cost?: CostSnapshot; session_turns?: number; usage?: Usage }
+      session_id?: string
+      type: 'session.stats'
+    }
   /** /goal indicator refresh — the latest snapshot (null hides it). Fired
    *  from /goal, /subgoal and /clear replies plus goal_status events. `rev`
    *  is the backend's monotonic capture counter: the store ignores carriers
