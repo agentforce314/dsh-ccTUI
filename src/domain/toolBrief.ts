@@ -66,7 +66,12 @@ export const emptyBriefCounts = (): BriefCounts => ({
 const READ_TOOLS = new Set(['Read'])
 const SEARCH_TOOLS = new Set(['Glob', 'Grep'])
 const EDIT_TOOLS = new Set(['Edit', 'NotebookEdit', 'Write'])
-const AGENT_TOOLS = new Set(['Agent', 'Delegate Task', 'Task'])
+// Delegation, under every name a backend gives it: upstream's Agent/Task, the
+// clawcodex `delegate_task`, and deepseek-harness's `subagent` /
+// `subagent_fork`. The trail anchors the inline subagent tree to this row, so a
+// missing name is not a cosmetic label difference — the whole tree loses the
+// block it hangs from.
+const AGENT_TOOLS = new Set(['Agent', 'Delegate Task', 'Subagent', 'Subagent Fork', 'Task'])
 const ANSWER_TOOLS = new Set(['Advisor', 'AskUserQuestion', 'Clarify', 'ExitPlanMode', 'Vision Analyze'])
 
 /** `Read(src/a.py)` → `Read`. Legacy trail lines may still carry a `(1.2s)`
@@ -142,6 +147,10 @@ export const classifyBriefTool = (call: string): BriefBucket => {
   // STANDALONE, so each keeps its own row and its own result.
   return 'other'
 }
+
+/** True when a trail line's `Tool(args)` names a delegation — the row the
+ *  inline subagent tree hangs from. */
+export const isDelegationCall = (call: string): boolean => AGENT_TOOLS.has(briefToolName(call))
 
 /**
  * Classification key for a RAW trail line: the `Tool(args)` call when the line

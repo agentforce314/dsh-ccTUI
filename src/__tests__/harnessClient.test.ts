@@ -197,7 +197,22 @@ function makeWorld() {
     }
   }
 
-  return { agent, cancels, client, ctx, events, fire, followups, listeners, planSets, policies, providers, resumedAgent, resumedHandle, steers }
+  /** A session/event from some OTHER session — a subagent's, or a sibling. */
+  const fireFrom = (sessionId: string, type: string, data: unknown) => {
+    const session = { events: [], header: { createdAt: 0, cwd: '/tmp/w', id: sessionId, version: 1 }, marker: 'other' }
+
+    for (const fn of listeners.get('session/event') ?? []) {
+      fn(session, { data, seq: 0, time: 0, type })
+    }
+  }
+
+  const emit = (name: string, ...args: unknown[]) => {
+    for (const fn of listeners.get(name) ?? []) {
+      fn(...args)
+    }
+  }
+
+  return { agent, cancels, client, ctx, emit, events, fire, fireFrom, followups, listeners, planSets, policies, providers, resumedAgent, resumedHandle, steers }
 }
 
 const settle = () => new Promise(resolve => setTimeout(resolve, 0))
@@ -469,6 +484,93 @@ describe('HarnessGatewayClient', () => {
     expect(done.payload.result_raw).toBe(
       '2 sources\ndeepseek-harness — https://github.com/deepseek-ai/deepseek-harness\nhttps://example.com/untitled'
     )
+  })
+
+  describe('subagents', () => {
+    const CHILD = 'child-session-1'
+
+    const delegating = async () => {
+      const w = makeWorld()
+
+      w.client.start()
+      await settle()
+      w.events.length = 0
+      w.fire('turn/start', { turn: 1 })
+      w.emit('subagent/start', { id: CHILD, local: true, provider: 'spawn', runId: 'run-1' })
+
+      return w
+    }
+
+    const subagentEvents = (w: ReturnType<typeof makeWorld>) =>
+      w.events.filter(e => e.type.startsWith('subagent.')) as Extract<GatewayEvent, { type: `subagent.${string}` }>[]
+
+    it('opens a row on the lifecycle edge and names it from the child’s own descriptor', async () => {
+      const w = await delegating()
+
+      // the label lands a beat after the start edge, on the child's descriptor
+      expect(subagentEvents(w).at(-1)).toMatchObject({ type: 'subagent.start', payload: { subagent_id: CHILD, task_index: 1 } })
+
+      w.fireFrom(CHILD, 'subagent/descriptor', { label: 'Review the diff', mode: 'one-shot', provider: 'spawn', version: 2 })
+
+      expect(subagentEvents(w).at(-1)).toMatchObject({
+        payload: { goal: 'Review the diff', subagent_id: CHILD },
+        type: 'subagent.start'
+      })
+    })
+
+    it('reports the child’s own tool calls', async () => {
+      const w = await delegating()
+
+      w.fireFrom(CHILD, 'tool/call', { arguments: '{"command":"ls -1 src"}', callId: 'c1', name: 'bash', step: 1, turn: 1 })
+
+      expect(subagentEvents(w).at(-1)).toMatchObject({
+        payload: { subagent_id: CHILD, tool_count: 1, tool_name: 'bash', tool_preview: 'ls -1 src' },
+        type: 'subagent.tool'
+      })
+    })
+
+    it('closes the row with what the child cost and what it answered', async () => {
+      const w = await delegating()
+
+      w.fireFrom(CHILD, 'tool/call', { arguments: '{}', callId: 'c1', name: 'bash', step: 1, turn: 1 })
+      w.fireFrom(CHILD, 'assistant/message', {
+        message: { content: [{ text: 'done', type: 'text' }], id: 'm1', role: 'assistant', source: { kind: 'model' } },
+        step: 1,
+        turn: 1,
+        usage: { inputTokens: 30, outputTokens: 7 }
+      })
+      w.emit('subagent/end', {
+        id: CHILD,
+        lastAssistantMessage: [{ text: 'src has 11 files', type: 'text' }],
+        local: true,
+        provider: 'spawn',
+        runId: 'run-1',
+        stopReason: 'completed'
+      })
+
+      expect(subagentEvents(w).at(-1)).toMatchObject({
+        payload: {
+          input_tokens: 30,
+          output_tokens: 7,
+          status: 'completed',
+          subagent_id: CHILD,
+          summary: 'src has 11 files',
+          tool_count: 1
+        },
+        type: 'subagent.complete'
+      })
+    })
+
+    it('ignores a session it was never told is a child', async () => {
+      const w = await delegating()
+      const before = subagentEvents(w).length
+
+      // a sibling top-level session shares the bus; its work is not this
+      // conversation's, and must never reach this transcript
+      w.fireFrom('some-other-session', 'tool/call', { arguments: '{}', callId: 'x', name: 'bash', step: 1, turn: 1 })
+
+      expect(subagentEvents(w)).toHaveLength(before)
+    })
   })
 
   it('marks a result flagged isError as failed even with no harness error identity', async () => {
