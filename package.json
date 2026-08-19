@@ -1,6 +1,6 @@
 {
   "name": "dsh-cctui",
-  "version": "0.3.14",
+  "version": "0.3.15",
   "description": "Claude-Code-style terminal UI for deepseek-harness, ported from clawcodex ui-tui",
   "license": "MIT",
   "repository": {
