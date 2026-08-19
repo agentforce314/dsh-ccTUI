@@ -19,11 +19,14 @@ describe('toTranscriptMessages', () => {
       { role: 'user', text: 'second prompt' }
     ]
 
+    // the shelf is its own block, exactly as the live path builds it
     expect(toTranscriptMessages(rows).map(msg => [msg.role, msg.text])).toEqual([
       ['user', 'first prompt'],
+      ['system', ''],
       ['assistant', 'first answer'],
       ['user', 'second prompt']
     ])
+    expect(toTranscriptMessages(rows)[1]?.kind).toBe('trail')
     expect(toTranscriptMessages(rows)[1]?.tools?.[0]).toContain('Search Files')
     // the row's text is the PRESENTED result the live trail showed, so a
     // resumed transcript reads the way it did the first time

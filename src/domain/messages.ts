@@ -77,7 +77,16 @@ export const toTranscriptMessages = (rows: unknown): Msg[] => {
     }
 
     if (role === 'assistant') {
-      out.push({ role, text, ...(pending.length && { tools: pending }) })
+      // The shelf is its OWN block, the way the live path builds it, not a
+      // field on the reply. Hanging it off the assistant message instead put a
+      // `└─ Response` separator between the two — so the same conversation
+      // rendered one way live and another way resumed, and only the resumed
+      // one carried a separator the original never shows.
+      if (pending.length) {
+        out.push({ kind: 'trail', role: 'system', text: '', tools: pending })
+      }
+
+      out.push({ role, text })
       pending = []
     } else if (role === 'user' || role === 'system') {
       out.push({ role, text })
