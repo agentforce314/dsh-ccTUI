@@ -327,6 +327,7 @@ export class HarnessGatewayClient extends GatewayClient {
   private usageTotals: Usage = { calls: 0, input: 0, output: 0, total: 0 }
   private turnCount = 0
   private permissionMode = 'default'
+  /** Per-call argument preview, for the approval box's command line. */
   private callArgs = new Map<string, string>()
   private callRawArgs = new Map<string, string>()
   /** Live subagents, keyed by the child's own session id. */
@@ -829,7 +830,7 @@ export class HarnessGatewayClient extends GatewayClient {
 
         this.callNames.set(id, name)
         this.callStarted.set(id, Date.now())
-        this.callArgs.set(id, prettyArgs(rawArgs))
+        this.callArgs.set(id, toolArgsPreview(rawArgs))
         this.callRawArgs.set(id, rawArgs)
 
         if (isDelegationCall(toolTrailLabel(name))) {
@@ -1008,7 +1009,12 @@ export class HarnessGatewayClient extends GatewayClient {
 
   private parkApproval(req: ApprovalRequest): Promise<ApprovalOutcome> {
     const id = req.callId ? String(req.callId) : ''
-    const command = (id ? this.callArgs.get(id) : undefined) ?? req.reason ?? req.toolName
+    // The SALIENT argument, not the whole argument object. This line is what
+    // the user actually reads before saying yes, and a shell call's escalation
+    // fields (`sandbox_permissions`, `justification`) crowded the command it is
+    // asking about off the end of it — while the warning line below already
+    // states the escalation and its justification.
+    const command = (id ? this.callArgs.get(id) : undefined) || req.reason || req.toolName
 
     return new Promise<ApprovalOutcome>(resolve => {
       this.gateApproval = { resolve }

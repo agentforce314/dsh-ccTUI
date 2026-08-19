@@ -804,6 +804,38 @@ describe('HarnessGatewayClient', () => {
     await expect(denied).resolves.toBe('rejected')
   })
 
+  it('asks about the command, not the escalation paperwork around it', async () => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.fire('turn/start', { turn: 1 })
+    w.fire('tool/call', {
+      arguments:
+        '{"command":"echo escalated","description":"an escalating echo","sandbox_permissions":"danger-full-access","justification":"the gallery needs the approval box"}',
+      callId: 'c7',
+      name: 'bash',
+      step: 1,
+      turn: 1
+    })
+
+    const handler = (w.listeners.get('approval/request') ?? [])[0]!
+
+    void handler(
+      { agent: w.agent, callId: 'c7', reason: 'escalate sandbox', toolName: 'bash' },
+      () => Promise.resolve('unavailable')
+    )
+    await settle()
+
+    const ask = w.events.at(-1) as Extract<GatewayEvent, { type: 'approval.request' }>
+
+    // this line is what the user reads before saying yes; the escalation and
+    // its justification already have their own warning row below it
+    expect(ask.payload.command).toBe('echo escalated')
+
+    await w.client.request('approval.respond', { choice: 'deny' })
+  })
+
   it('delegates approvals for other agents down the chain', async () => {
     const w = makeWorld()
 

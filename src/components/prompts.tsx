@@ -2,6 +2,7 @@ import { Box, Text, useInput, wrapAnsi } from '@dsh-cctui/ink'
 import { useState } from 'react'
 
 import { isMac } from '../lib/platform.js'
+import { toolTrailLabel } from '../lib/text.js'
 import type { Theme } from '../theme.js'
 import type { ApprovalReq, ClarifyReq, ConfirmReq, PlanApprovalReq } from '../types.js'
 
@@ -135,7 +136,7 @@ export function ApprovalPrompt({ cols = 80, onChoice, req, t }: ApprovalPromptPr
 
   return (
     <Box borderColor={t.color.warn} borderStyle="round" flexDirection="column" paddingX={1}>
-      <Text bold color={t.color.warn}>{req.toolName} command</Text>
+      <Text bold color={t.color.warn}>{toolTrailLabel(req.toolName)} command</Text>
 
       <Box flexDirection="column" paddingLeft={1}>
         {shown.map((line, i) => (
