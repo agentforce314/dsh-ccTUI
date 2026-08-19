@@ -19,13 +19,17 @@ import type { ApprovalOutcome, ApprovalRequest } from '@deepseek-ai/dsh-user-app
 import type { AskUserQuestionAnswer, AskUserQuestionItem, AskUserQuestionRequest } from '@deepseek-ai/dsh-user-questions'
 // Type-only: activates the 'plan/mode' SessionEventMap augmentation.
 import type {} from '@deepseek-ai/dsh-plan-mode'
+// Type-only: activates the subagent lifecycle Events and the
+// 'subagent/descriptor' SessionEventMap augmentation.
+import type {} from '@deepseek-ai/dsh-subagent'
 
 import { toolArgsPreview } from '../domain/toolArgs.js'
 import { GatewayClient, SLASHES } from '../gatewayClient.js'
 import { appHome } from '../lib/appHome.js'
+import { compactPreview } from '../lib/text.js'
 import { structuredPatch } from 'diff'
 
-import type { GatewayTranscriptMessage, StructuredDiffPayload } from '../gatewayTypes.js'
+import type { GatewayEvent, GatewayTranscriptMessage, StructuredDiffPayload } from '../gatewayTypes.js'
 import type { SessionInfo, Usage } from '../types.js'
 
 const PLUGIN_VERSION = (() => {
@@ -47,6 +51,28 @@ const PLUGIN_VERSION = (() => {
 
   return ''
 })()
+
+/**
+ * What one running subagent has done so far, accumulated from ITS OWN session
+ * log rather than from the delegating call.
+ *
+ * Correlation is the whole reason this is keyed on the child's session id: the
+ * harness's own guidance tells a model to start independent delegations
+ * together in one message, so pairing a child with its call by arrival order
+ * would attribute one delegation's work to another as soon as two run at once.
+ * The child's id appears on both lifecycle edges and on every event its session
+ * emits, so nothing has to be guessed.
+ */
+interface ChildRun {
+  /** The delegation's short description, learned from the child's descriptor. */
+  goal: string
+  /** Spawn order, which is what orders the inline tree's rows. */
+  index: number
+  inputTokens: number
+  outputTokens: number
+  startedAt: number
+  toolCount: number
+}
 
 export interface HarnessClientOptions {
   cwd?: string
@@ -286,6 +312,9 @@ export class HarnessGatewayClient extends GatewayClient {
   private permissionMode = 'default'
   private callArgs = new Map<string, string>()
   private callRawArgs = new Map<string, string>()
+  /** Live subagents, keyed by the child's own session id. */
+  private children = new Map<string, ChildRun>()
+  private childCount = 0
   private pendingTodos: unknown[] | null = null
   private generatingAnnounced = new Set<string>()
   private gateApproval: { resolve: (o: ApprovalOutcome) => void } | null = null
@@ -489,12 +518,26 @@ export class HarnessGatewayClient extends GatewayClient {
   private bindAgent(agent: Agent): void {
     this.agentDisposers.push(
       this.ctx.on('session/event', (session: Session, event: SessionEvent) => {
-        if (session !== agent.session) {
+        if (session === agent.session) {
+          this.onSessionEvent(event)
+
           return
         }
 
-        this.onSessionEvent(event)
+        // Any OTHER session on the bus — a sibling top-level session, or a
+        // subagent's. `onChildSessionEvent` ignores everything it has not been
+        // told is a child by the lifecycle edge below, so a second session in
+        // the same process can never leak into this one's transcript.
+        this.onChildSessionEvent(String(session.header.id), event)
       }) as () => void
+    )
+    this.agentDisposers.push(
+      this.ctx.on('subagent/start', (info: { id: unknown }) => this.startChild(String(info.id))) as () => void
+    )
+    this.agentDisposers.push(
+      this.ctx.on('subagent/end', (info: { id: unknown; lastAssistantMessage?: ContentBlock[]; stopReason?: string }) =>
+        this.endChild(String(info.id), info.stopReason, info.lastAssistantMessage)
+      ) as () => void
     )
     this.agentDisposers.push(
       this.ctx.on('agent/status', ({ agent: subject, status }: { agent: Agent; status: 'idle' | 'running' }) => {
@@ -509,6 +552,126 @@ export class HarnessGatewayClient extends GatewayClient {
         }
       }) as () => void
     )
+  }
+
+  // ── subagents ──────────────────────────────────────────────────────────
+  //
+  // The delegating tool call tells us nothing about what the child did — it
+  // returns the child's final answer and no more. Everything the inline tree
+  // draws (which tools ran, how long, how many tokens) is read off the child's
+  // OWN session log, joined to the lifecycle edges by the child's session id.
+
+  private publishChild(
+    type: 'subagent.complete' | 'subagent.start' | 'subagent.thinking' | 'subagent.tool',
+    id: string,
+    child: ChildRun,
+    extra: Record<string, unknown> = {}
+  ): void {
+    this.publishLocalEvent({
+      payload: {
+        goal: child.goal,
+        subagent_id: id,
+        task_index: child.index,
+        tool_count: child.toolCount,
+        ...extra
+      },
+      session_id: this.sid,
+      type
+    } as GatewayEvent)
+  }
+
+  private startChild(id: string): void {
+    if (this.children.has(id)) {
+      return
+    }
+
+    this.childCount += 1
+
+    const child: ChildRun = {
+      goal: '',
+      index: this.childCount,
+      inputTokens: 0,
+      outputTokens: 0,
+      startedAt: Date.now(),
+      toolCount: 0
+    }
+
+    this.children.set(id, child)
+    // The label arrives a beat later, on the child's own descriptor event; the
+    // row is upserted by id, so the goal fills itself in.
+    this.publishChild('subagent.start', id, child, { status: 'running' })
+  }
+
+  private endChild(id: string, stopReason?: string, output?: ContentBlock[]): void {
+    const child = this.children.get(id)
+
+    if (!child) {
+      return
+    }
+
+    this.children.delete(id)
+    this.publishChild('subagent.complete', id, child, {
+      duration_seconds: Math.max(0, Date.now() - child.startedAt) / 1000,
+      input_tokens: child.inputTokens,
+      output_tokens: child.outputTokens,
+      status: stopReason === 'completed' ? 'completed' : stopReason === 'interrupted' ? 'interrupted' : 'failed',
+      summary: compactPreview(textOf(output, ['text']), 200)
+    })
+  }
+
+  private onChildSessionEvent(id: string, event: SessionEvent): void {
+    const child = this.children.get(id)
+
+    if (!child) {
+      return
+    }
+
+    switch (event.type) {
+      case 'subagent/descriptor': {
+        const label = (event.data as { label?: string }).label
+
+        if (label && label !== child.goal) {
+          child.goal = label
+          this.publishChild('subagent.start', id, child, { status: 'running' })
+        }
+
+        break
+      }
+
+      case 'tool/call': {
+        const { name, arguments: rawArgs } = (event as SessionEvent<'tool/call'>).data
+
+        child.toolCount += 1
+        this.publishChild('subagent.tool', id, child, {
+          tool_name: name,
+          tool_preview: toolArgsPreview(rawArgs)
+        })
+        break
+      }
+
+      case 'assistant/message': {
+        const { message, usage } = (event as SessionEvent<'assistant/message'>).data
+
+        if (usage) {
+          child.inputTokens += usage.inputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
+          child.outputTokens += usage.outputTokens
+        }
+
+        // One event per step rather than one per delta: a child's reasoning
+        // streams as fast as the parent's, and the tree shows the last few
+        // lines, not every keystroke of them.
+        const reasoning = textOf(message.content, ['reasoning']).trim()
+
+        if (reasoning) {
+          this.publishChild('subagent.thinking', id, child, { text: reasoning })
+        }
+
+        break
+      }
+
+      default:
+        break
+    }
   }
 
   // ── session/event → GatewayEvent translation ──────────────────────────

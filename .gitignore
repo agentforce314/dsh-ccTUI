@@ -9,3 +9,4 @@ packages/dsh-cctui-ink/dist/
 .DS_Store
 e2e-scratch/
 /.dsh-install-home/
+__pycache__/

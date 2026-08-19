@@ -23,7 +23,8 @@ import {
   briefText,
   classifyBriefTool,
   emptyBriefCounts,
-  isCollapsibleBucket
+  isCollapsibleBucket,
+  isDelegationCall
 } from '../domain/toolBrief.js'
 import { transcriptTrailWidth } from '../lib/inputMetrics.js'
 import { buildToolTrailLine, stripAnsi } from '../lib/text.js'
@@ -32,6 +33,20 @@ import { DEFAULT_THEME } from '../theme.js'
 import type { Msg } from '../types.js'
 
 // ── classification ──────────────────────────────────────────────────────────
+
+describe('isDelegationCall', () => {
+  it('knows delegation under every name a backend gives it', () => {
+    // the inline subagent tree hangs off this row, so a missing name is not a
+    // cosmetic label difference — the tree loses the block it attaches to
+    expect(isDelegationCall('Task(Review the diff)')).toBe(true)
+    expect(isDelegationCall('Agent(Review the diff)')).toBe(true)
+    expect(isDelegationCall('Delegate Task(Review the diff)')).toBe(true)
+    expect(isDelegationCall('Subagent(Review the diff)')).toBe(true)
+    expect(isDelegationCall('Subagent Fork(Review the diff)')).toBe(true)
+    expect(isDelegationCall('Bash(ls)')).toBe(false)
+    expect(isDelegationCall('Send Message(subagent_id: a)')).toBe(false)
+  })
+})
 
 describe('classifyBriefTool', () => {
   it('buckets the file/search tools', () => {

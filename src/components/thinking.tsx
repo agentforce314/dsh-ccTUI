@@ -4,7 +4,7 @@ import spinners, { type BrailleSpinnerName } from 'unicode-animations'
 
 import { THINKING_COT_MAX } from '../config/limits.js'
 import { sectionMode } from '../domain/details.js'
-import { briefClauses, type BriefCounts, briefRuns, countBriefTools } from '../domain/toolBrief.js'
+import { briefClauses, type BriefCounts, briefRuns, countBriefTools, isDelegationCall } from '../domain/toolBrief.js'
 import {
   buildSubagentTree,
   fmtTokens,
@@ -964,7 +964,7 @@ export const ToolTrail = memo(function ToolTrail({
   const toolTokensLabel = toolTokens !== undefined && toolTokens > 0 ? `~${fmtK(toolTokens)} tokens` : undefined
 
   const totalTokensLabel = tokenCount > 0 && toolTokenCount > 0 ? `~${fmtK(totalTokenCount)} total` : null
-  const delegateGroups = groups.filter(g => g.label.startsWith('Delegate Task'))
+  const delegateGroups = groups.filter(g => isDelegationCall(g.label))
   const inlineDelegateKey = hasSubagents && delegateGroups.length === 1 ? delegateGroups[0]!.key : null
 
   const toolLabel = (group: Group) => {
@@ -1125,7 +1125,7 @@ export const ToolTrail = memo(function ToolTrail({
   // delegations, questions — keep even while collapsed. `gap` opens the blank
   // line upstream leaves between consecutive blocks.
   const renderGroup = (group: Group, gap: boolean) => {
-    const isDelegateGroup = group.label.startsWith('Delegate Task')
+    const isDelegateGroup = isDelegationCall(group.label)
     const bulletColor = group.error ? t.color.error : t.color.ok
 
     return (
