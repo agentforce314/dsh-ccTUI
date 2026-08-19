@@ -561,6 +561,101 @@ describe('HarnessGatewayClient', () => {
       })
     })
 
+    const delegate = async (
+      w: ReturnType<typeof makeWorld>,
+      { callId = 'd1', resultText = 'the child answer' }: { callId?: string; resultText?: string } = {}
+    ) => {
+      w.fire('tool/call', {
+        arguments: '{"description":"Review the diff","prompt":"…"}',
+        callId,
+        name: 'subagent',
+        step: 1,
+        turn: 1
+      })
+
+      return () =>
+        w.fire('tool/result', {
+          message: { content: [{ content: [{ text: resultText, type: 'text' }], toolCallId: callId, type: 'tool-result' }] },
+          step: 1,
+          turn: 1
+        })
+    }
+
+    const runChild = (w: ReturnType<typeof makeWorld>, id: string, tools: number, outputTokens: number) => {
+      w.emit('subagent/start', { id, local: true, provider: 'spawn', runId: `run-${id}` })
+
+      for (let i = 0; i < tools; i++) {
+        w.fireFrom(id, 'tool/call', { arguments: '{}', callId: `t${i}`, name: 'bash', step: 1, turn: 1 })
+      }
+
+      w.fireFrom(id, 'assistant/message', {
+        message: { content: [{ text: 'ok', type: 'text' }], id: 'm', role: 'assistant', source: { kind: 'model' } },
+        step: 1,
+        turn: 1,
+        usage: { inputTokens: 0, outputTokens }
+      })
+      w.emit('subagent/end', { id, local: true, provider: 'spawn', runId: `run-${id}`, stopReason: 'completed' })
+    }
+
+    it('states the delegation instead of pasting the child’s whole reply', async () => {
+      const w = makeWorld()
+
+      w.client.start()
+      await settle()
+      w.events.length = 0
+      w.fire('turn/start', { turn: 1 })
+
+      const finish = await delegate(w)
+
+      runChild(w, 'kid-1', 2, 1200)
+      finish()
+
+      const done = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
+
+      expect(done.payload.result_text).toMatch(/^Done \(2 tool uses · 1\.2k tokens · \d+s\)$/)
+      // the reply is still one ctrl+o away — the model read it, so can the user
+      expect(done.payload.result_raw).toBe('the child answer')
+    })
+
+    it('says a background delegation is still going', async () => {
+      const w = makeWorld()
+
+      w.client.start()
+      await settle()
+      w.events.length = 0
+      w.fire('turn/start', { turn: 1 })
+
+      const finish = await delegate(w, { resultText: 'started subagent 91ffa6de' })
+
+      finish()
+
+      const done = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
+
+      expect(done.payload.result_text).toBe('Backgrounded agent')
+      expect(done.payload.result_raw).toBe('started subagent 91ffa6de')
+    })
+
+    it('reports only its own elapsed time when two delegations are in flight', async () => {
+      const w = makeWorld()
+
+      w.client.start()
+      await settle()
+      w.events.length = 0
+      w.fire('turn/start', { turn: 1 })
+
+      const finishA = await delegate(w, { callId: 'd1' })
+
+      await delegate(w, { callId: 'd2' })
+      runChild(w, 'kid-1', 3, 900)
+      finishA()
+
+      const done = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
+
+      // attributing one child's tokens to the other's row is worse than
+      // reporting only what this call itself took
+      expect(done.payload.result_text).toMatch(/^Done \(\d+s\)$/)
+    })
+
     it('ignores a session it was never told is a child', async () => {
       const w = await delegating()
       const before = subagentEvents(w).length
