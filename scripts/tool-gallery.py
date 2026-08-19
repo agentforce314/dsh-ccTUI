@@ -57,6 +57,11 @@ SCENARIOS: dict[str, object] = {
     "grep_empty": 'PROBE grep {"pattern": "zzzz-no-such-token-zzzz", "path": "src"}',
     "glob": 'PROBE glob {"pattern": "src/components/*.tsx"}',
     "bash": 'PROBE bash {"command": "ls -1 src | head -12", "description": "list src"}',
+    # a command that emits over time — pair with --live to see the running row
+    "bash_stream": (
+        'PROBE bash {"command": "for i in 1 2 3 4 5 6 7 8; do echo line-$i; sleep 1; done",'
+        ' "description": "print 8 lines with a 1s delay"}'
+    ),
     "bash_fail": 'PROBE bash {"command": "ls /no/such/dir", "description": "failing ls"}',
     "write": 'PROBE write {"file_path": "e2e-scratch/gallery-write.txt", "content": "alpha\\nbeta\\ngamma\\n"}',
     # the harness refuses to edit a file this session has not observed, so the

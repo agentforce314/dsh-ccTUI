@@ -927,6 +927,14 @@ export const ToolTrail = memo(function ToolTrail({
     }
 
     const label = formatToolCall(tool.name, tool.context || '')
+    // Upstream's running row is a live clock — `$ <cmd> (6s · 7 lines)` on a
+    // shell call. The line count needs output while the tool is still running,
+    // and deepseek-harness publishes nothing at all between `tool/call` and
+    // `tool/result`, so the elapsed half is what can be told truthfully. Held
+    // back for the first second so a call that returns immediately never
+    // flashes a `(0s)`.
+    const elapsed = tool.startedAt ? Math.floor((now - tool.startedAt) / 1000) : 0
+    const running = elapsed > 0 ? `Running… (${elapsed}s)` : 'Running…'
 
     groups.push({
       color: t.color.text,
@@ -935,7 +943,7 @@ export const ToolTrail = memo(function ToolTrail({
       live: true,
       // CC parity: a running tool shows a dim "Running…" result row; the
       // bullet itself blinks (rendered in the flat pass below).
-      details: [{ color: t.color.muted, content: 'Running…', dimColor: true, key: `${tool.id}-run` }],
+      details: [{ color: t.color.muted, content: running, dimColor: true, key: `${tool.id}-run` }],
       content: label
     })
   }
