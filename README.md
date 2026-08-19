@@ -56,8 +56,16 @@ npm run e2e:install              # the real `dsh plugin add` install path
 
 ### Versioning
 
-Each shipped change bumps the **patch** digit by 0.0.1 — `0.3.0` → `0.3.1` → `0.3.2`. Bump
-`package.json` in the change's own commit, then tag `v<version>` on `main` after it merges.
+Each shipped change increments the **patch** digit by one; it runs to 99 before rolling over
+into the minor digit:
+
+```
+0.2.0 → 0.2.1 → … → 0.2.13 → … → 0.2.99 → 0.3.0 → 0.3.1 → …
+```
+
+Write patch numbers without leading zeros (`0.3.1`, not `0.3.01` — the latter is not valid
+semver and npm rejects it). Bump `package.json` in the change's own commit, then tag
+`v<version>` on `main` after it merges.
 
 Architecture and porting details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 [docs/PLAN.md](docs/PLAN.md), [docs/PORTING-NOTES.md](docs/PORTING-NOTES.md). The adapter
