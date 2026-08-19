@@ -415,8 +415,24 @@ class TurnController {
 
     const segments = this.segmentMessages
     const partial = this.bufRef.trimStart()
-    const tools = this.pendingSegmentTools
-    const toolsVerbose = this.pendingSegmentToolsVerbose
+
+    // CC parity string (InterruptedByUser.tsx): a dim one-liner that invites
+    // the redirect instead of a bare "[interrupted]" tag. It is the SAME
+    // string on the killed tool's own `⎿` row, which is where upstream puts
+    // it too.
+    const interruptNote = 'Interrupted · What should dsh-ccTUI do instead?'
+
+    // A tool still running when Esc lands had no completion event and would
+    // vanish with the turn — losing the one row that says what was cut off
+    // mid-flight. Upstream keeps it: `⏺ Bash(find / -name …)` over
+    // `⎿ Interrupted · …`, folded into the collapsed brief like any other
+    // settled call (NOT as an error, or it would break out of the brief and
+    // read as a failure it was not).
+    const interruptedTools = this.activeTools.map(tool =>
+      buildToolTrailLine(tool.name, tool.context ?? '', false, interruptNote)
+    )
+    const tools = [...this.pendingSegmentTools, ...interruptedTools]
+    const toolsVerbose = [...this.pendingSegmentToolsVerbose, ...interruptedTools.map(() => '')]
 
     // Drain streaming/segment state off the nanostore before writing the
     // preserved snapshot to the transcript — otherwise each flushed segment
@@ -434,16 +450,26 @@ class TurnController {
     // `partial` or pending tools, fold them into a single assistant message;
     // otherwise emit a sys note so the transcript always records that the
     // turn was cancelled, even when only prior `segments` were preserved.
-    // CC parity string (InterruptedByUser.tsx): a dim one-liner that invites
-    // the redirect instead of a bare "[interrupted]" tag.
-    const interruptNote = 'Interrupted · What should dsh-ccTUI do instead?'
+    // …once. A killed tool's own row already says it, so repeating the note as
+    // the reply would print the same sentence twice, three lines apart.
+    const noteCarried = interruptedTools.length > 0
+    const shelf = tools.length ? { tools, ...(toolsVerbose.some(Boolean) && { toolsVerbose }) } : {}
 
-    if (partial || tools.length) {
+    if (partial) {
       appendMessage({
         role: 'assistant',
-        text: partial ? `${partial}\n\n*${interruptNote}*` : `*${interruptNote}*`,
-        ...(tools.length && { tools, ...(toolsVerbose.some(Boolean) && { toolsVerbose }) })
+        text: noteCarried ? partial : `${partial}\n\n*${interruptNote}*`,
+        ...shelf
       })
+    } else if (tools.length) {
+      // No reply to attach the shelf to — hang it off a bare trail message the
+      // way a settled segment does, rather than an assistant bubble with no
+      // text, which renders as an empty `⏺` row.
+      appendMessage({ kind: 'trail', role: 'system', text: '', ...shelf })
+
+      if (!noteCarried) {
+        sys(interruptNote)
+      }
     } else {
       sys(interruptNote)
     }

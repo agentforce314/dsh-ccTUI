@@ -282,6 +282,22 @@ const prettyArgs = (raw: string): string => {
   }
 }
 
+/**
+ * Add one step's token accounting to a running session odometer, in place.
+ * `input` folds in cache reads and writes because that is what the client's
+ * `Usage` contract means by input — the whole prompt that was paid for, not
+ * just its uncached part — and `total` is kept derived so no caller can set
+ * one without the other. Shared by live counting and by the log replay a
+ * resume runs, which is the only way the two can agree.
+ */
+const foldUsage = (totals: Usage, usage: TokenUsage): void => {
+  totals.calls += 1
+  totals.input += usage.inputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
+  totals.output += usage.outputTokens
+  totals.reasoning = (totals.reasoning ?? 0) + (usage.reasoningTokens ?? 0)
+  totals.total = totals.input + totals.output
+}
+
 export class HarnessGatewayClient extends GatewayClient {
   private readonly ctx: Context
   private readonly opts: HarnessClientOptions
@@ -429,8 +445,33 @@ export class HarnessGatewayClient extends GatewayClient {
     this.turnText = []
     this.turnReasoning = []
     this.msgStartedHarness = false
-    this.usageTotals = { calls: 0, input: 0, output: 0, total: 0 }
+    this.usageTotals = this.replayUsage(events)
     this.info = this.buildSessionInfo(this.selection.current, handle.agent.session.header.cwd ?? this.workingDir())
+  }
+
+  /**
+   * Rebuild the session's token odometer from its log, the same way the line
+   * above rebuilds the turn odometer. Every step's accounting is durable —
+   * `assistant/message` carries the `usage` the adapter reported — so a
+   * resumed session has no reason to restart its counters at zero while
+   * `turns:` keeps counting; that mismatch was visible on the stats line.
+   */
+  private replayUsage(events: readonly SessionEvent[]): Usage {
+    const totals: Usage = { calls: 0, input: 0, output: 0, total: 0 }
+
+    for (const event of events) {
+      if (event.type !== 'assistant/message') {
+        continue
+      }
+
+      const { usage } = (event as SessionEvent<'assistant/message'>).data
+
+      if (usage) {
+        foldUsage(totals, usage)
+      }
+    }
+
+    return totals
   }
 
   /** Fold a session event log into resume-transcript rows. */
@@ -900,11 +941,7 @@ export class HarnessGatewayClient extends GatewayClient {
   }
 
   private addUsage(usage: TokenUsage): void {
-    this.usageTotals.calls += 1
-    this.usageTotals.input += usage.inputTokens + (usage.cacheReadTokens ?? 0) + (usage.cacheWriteTokens ?? 0)
-    this.usageTotals.output += usage.outputTokens
-    this.usageTotals.reasoning = (this.usageTotals.reasoning ?? 0) + (usage.reasoningTokens ?? 0)
-    this.usageTotals.total = this.usageTotals.input + this.usageTotals.output
+    foldUsage(this.usageTotals, usage)
   }
 
   private finishTurn(): void {
@@ -1470,7 +1507,13 @@ export class HarnessGatewayClient extends GatewayClient {
           const running = handle.agent.status === 'running'
 
           this.publishLocalEvent({ payload: this.info!, session_id: this.sid, type: 'session.info' })
-          this.publishLocalEvent({ payload: { session_turns: this.turnCount }, session_id: this.sid, type: 'session.stats' })
+          this.publishLocalEvent({
+            // The odometer AND the totals: both were just replayed out of the
+            // log, and the next end-of-turn result may be a whole turn away.
+            payload: { session_turns: this.turnCount, usage: { ...this.usageTotals } },
+            session_id: this.sid,
+            type: 'session.stats'
+          })
 
           return {
             info: this.info ?? undefined,

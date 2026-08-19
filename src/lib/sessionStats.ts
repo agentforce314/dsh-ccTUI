@@ -5,13 +5,16 @@
  *   deepseek · deepseek-v4-flash · ~/work/app · turns: 3 · tokens: 33189 in / 622 out · cost $0.0048
  *
  * Token/cost totals derive from the backend's end-of-turn CostSnapshot (the
- * same accumulators /cost prints, subagents included, restored on /resume);
- * the turn count is the server's `session_turns` odometer.
+ * same accumulators /cost prints, subagents included, restored on /resume)
+ * when there is one, and from its cumulative `usage` odometer when there is
+ * not — a backend with no price table publishes only the latter. The turn
+ * count is the server's `session_turns` odometer.
  */
 import { stringWidth } from '@dsh-cctui/ink'
 
 import { shortCwd } from '../domain/paths.js'
 import type { CostSnapshot } from '../gatewayTypes.js'
+import type { Usage } from '../types.js'
 
 import { formatCost } from './costSummary.js'
 
@@ -36,6 +39,23 @@ export function statsFromCostSnapshot(snap: CostSnapshot, turns: number): Sessio
   }
 
   return { costUsd: snap.total_cost_usd ?? 0, inputTokens: input, outputTokens: output, turns }
+}
+
+/**
+ * Fold the cumulative `Usage` odometer a price-free backend publishes instead
+ * of a CostSnapshot. The dsh harness is one: its `TokenUsage` carries tokens
+ * and nothing else, so there is no per-model spend to snapshot and `cost_usd`
+ * is normally absent — `buildSessionStatsLine` then drops the cost segment
+ * rather than printing `$0.0000`. `usage.input` already has cache reads and
+ * writes folded in, which is exactly what `inputTokens` means above.
+ */
+export function statsFromUsage(usage: Usage, turns: number): SessionStats {
+  return {
+    costUsd: usage.cost_usd ?? 0,
+    inputTokens: usage.input ?? 0,
+    outputTokens: usage.output ?? 0,
+    turns
+  }
 }
 
 export interface SessionStatsLineInput {

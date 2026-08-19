@@ -28,13 +28,14 @@
 
 /**
  * Arguments that never identify a call. Bulk payloads (a file body, an edit's
- * before/after, a checklist, a delegation's brief, a plan under review) and
- * policy/qualifier fields
+ * before/after, a checklist, a delegation's brief, a plan under review, a
+ * workflow's script) and policy/qualifier fields
  * (why a command may escalate, which window of a file to read) both make the
  * row longer and less distinguishable, which is the opposite of the point.
  */
 const NOISE_KEYS: ReadonlySet<string> = new Set([
   // bulk payloads
+  'code',
   'content',
   'file_text',
   'items',
@@ -44,6 +45,7 @@ const NOISE_KEYS: ReadonlySet<string> = new Set([
   'old_string',
   'plan',
   'prompt',
+  'script',
   'todos',
   // policy / qualifiers
   'justification',
@@ -82,14 +84,35 @@ const renderValue = (value: unknown): string => {
   return json === undefined ? String(value) : json
 }
 
-const project = (entries: [string, unknown][]): string => {
-  // A single surviving argument IS the call's identity — `Read(src/a.ts)`, not
-  // `Read(file_path: src/a.ts)`. More than one needs its keys to stay legible.
-  if (entries.length === 1 && typeof entries[0]![1] === 'string') {
-    return entries[0]![1] as string
+/**
+ * An object argument that carries its own `name` IS that name — a workflow's
+ * `meta` block, a bridge's descriptor. Rendered as JSON it would put the
+ * identity behind a brace and two quotes, and the row's 64 columns then lose
+ * it to the truncation ellipsis, which is the one thing the parens exist to
+ * prevent.
+ */
+const identify = (value: unknown): unknown => {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    const name = (value as { name?: unknown }).name
+
+    if (typeof name === 'string' && name) {
+      return name
+    }
   }
 
-  return entries.map(([key, value]) => `${key}: ${renderValue(value)}`).join(', ')
+  return value
+}
+
+const project = (entries: [string, unknown][]): string => {
+  const named = entries.map(([key, value]) => [key, identify(value)] as [string, unknown])
+
+  // A single surviving argument IS the call's identity — `Read(src/a.ts)`, not
+  // `Read(file_path: src/a.ts)`. More than one needs its keys to stay legible.
+  if (named.length === 1 && typeof named[0]![1] === 'string') {
+    return named[0]![1] as string
+  }
+
+  return named.map(([key, value]) => `${key}: ${renderValue(value)}`).join(', ')
 }
 
 /**

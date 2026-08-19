@@ -56,6 +56,13 @@ describe('toolArgsPreview', () => {
     expect(toolArgsPreview(raw)).toBe('')
   })
 
+  it('identifies a workflow by its meta name, not the script it runs', () => {
+    const raw = '{"script":"log(\\"hi\\")\\nreturn 1","meta":{"name":"gap-probe","description":"one line"}}'
+
+    // the script filled the parens and pushed the identity past the ellipsis
+    expect(toolArgsPreview(raw)).toBe('gap-probe')
+  })
+
   it('renders nothing when every argument is bulk, leaving a bare label', () => {
     // `⏺ Todo Write` with the checklist below it, the way upstream renders it —
     // formatToolCall drops the parens entirely for an empty preview

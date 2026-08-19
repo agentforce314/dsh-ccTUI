@@ -15,11 +15,11 @@ import { linkTipFor } from '../lib/linkAffordance.js'
 import { isTodoDone } from '../lib/liveProgress.js'
 import { openExternalUrl } from '../lib/openExternalUrl.js'
 import { rpcErrorMessage } from '../lib/rpc.js'
-import { statsFromCostSnapshot } from '../lib/sessionStats.js'
+import { statsFromCostSnapshot, statsFromUsage } from '../lib/sessionStats.js'
 import { topLevelSubagents } from '../lib/subagentTree.js'
 import { formatAbandonedClarify, formatToolCall, stripAnsi } from '../lib/text.js'
 import { fromSkin } from '../theme.js'
-import type { Msg, SubagentProgress, SubagentStatus } from '../types.js'
+import type { Msg, SubagentProgress, SubagentStatus, Usage } from '../types.js'
 
 import { applyCronSnapshot, resetCronState } from './cronStore.js'
 import { applyDelegationStatus, getDelegationState } from './delegationStore.js'
@@ -85,22 +85,41 @@ const normalizeSubagentStatus = (status: unknown, fallback: SubagentStatus): Sub
 }
 
 // Stats line under the composer: token/cost totals fold out of the backend's
-// cumulative CostSnapshot; the turn odometer is server-authoritative. Each
+// cumulative accumulators; the turn odometer is server-authoritative. Each
 // piece updates independently so an empty best-effort snapshot ({}) can't
 // zero the totals and a snapshot-only payload can't stall the odometer.
-const foldSessionStats = (snap: CostSnapshot | undefined, turns: number | undefined): void => {
+//
+// A CostSnapshot wins when there is one — it is per-model, subagent-inclusive
+// and priced. A backend with no price table has none to send and reports the
+// same odometer through `usage` instead (the dsh harness does exactly this),
+// so that is the fallback; without it the line read `tokens: 0 in / 0 out`
+// for the whole session. `usage` is only ever a fallback because on a
+// snapshot-carrying backend it describes the last call, not the session.
+const foldSessionStats = (
+  snap: CostSnapshot | undefined,
+  usage: Usage | undefined,
+  turns: number | undefined
+): void => {
   const hasSnap = !!snap && Object.keys(snap).length > 0
+  const hasUsage = !!usage && ((usage.input ?? 0) > 0 || (usage.output ?? 0) > 0)
 
-  if (!hasSnap && typeof turns !== 'number') {
+  if (!hasSnap && !hasUsage && typeof turns !== 'number') {
     return
   }
 
-  patchUiState(state => ({
-    ...state,
-    sessionStats: hasSnap
-      ? statsFromCostSnapshot(snap!, turns ?? state.sessionStats.turns)
-      : { ...state.sessionStats, turns: turns! }
-  }))
+  patchUiState(state => {
+    const turnsNow = turns ?? state.sessionStats.turns
+
+    if (hasSnap) {
+      return { ...state, sessionStats: statsFromCostSnapshot(snap!, turnsNow) }
+    }
+
+    if (hasUsage) {
+      return { ...state, sessionStats: statsFromUsage(usage!, turnsNow) }
+    }
+
+    return { ...state, sessionStats: { ...state.sessionStats, turns: turns! } }
+  })
 }
 
 export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev: GatewayEvent) => void {
@@ -1079,7 +1098,7 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
         // data source (printed by registerCostSummaryOnExit, entry.tsx).
         setLastCostSnapshot(ev.payload?.cost)
 
-        foldSessionStats(ev.payload?.cost, ev.payload?.session_turns)
+        foldSessionStats(ev.payload?.cost, ev.payload?.usage, ev.payload?.session_turns)
 
         return
       }
@@ -1087,7 +1106,7 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
       case 'session.stats':
         // Out-of-band refresh from a /clear or /resume reply — the next
         // end-of-turn result may be a whole turn away.
-        foldSessionStats(ev.payload?.cost, ev.payload?.session_turns)
+        foldSessionStats(ev.payload?.cost, ev.payload?.usage, ev.payload?.session_turns)
 
         return
 

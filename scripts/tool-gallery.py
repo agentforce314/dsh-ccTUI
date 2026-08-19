@@ -84,6 +84,10 @@ SCENARIOS: dict[str, object] = {
     "subagent_background": (
         'PROBE subagent {"description": "Audit the tests", "prompt": "Summarise the test layout and stop."}'
     ),
+    "workflow": (
+        'PROBE workflow {"script": "log(\\"hello from the workflow\\")\\nreturn { ok: true }",'
+        ' "meta": {"name": "gap-probe", "description": "a one-line workflow that returns immediately"}}'
+    ),
     "skill": 'PROBE skill {"name": "nonexistent-skill"}',
     "read_image": 'PROBE read_image {"file_path": "e2e-scratch/gallery.png"}',
     # this one insists on an absolute path
