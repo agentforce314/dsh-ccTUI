@@ -83,6 +83,11 @@ npm run e2e                      # PTY e2e against a real dsh boot + scripted LL
 npm run e2e:install              # the real `dsh plugin add` install path
 ```
 
+Tool rows are the fiddliest surface to eyeball, so they have their own harness:
+`python3 scripts/tool-gallery.py [tool…] [--expand]` drives a real dsh boot through one
+harness tool per scenario (via the scripted `test/e2e/probe-llm.mjs`) and prints the trail it
+rendered — the thing to diff against the same call made to Claude Code.
+
 ### Versioning
 
 Each shipped change increments the **patch** digit by one; it runs to 99 before rolling over
