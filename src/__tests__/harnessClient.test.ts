@@ -29,6 +29,17 @@ const TOOL_CARDS: Record<string, unknown> = {
     truncated: false
   },
   killed_bash: { card: 'terminal', output: 'partial', signal: 'SIGTERM' },
+  web_fetch: { card: 'web', kind: 'fetch', statusCode: 200, truncated: false, url: 'https://example.com' },
+  web_fetch_gone: { card: 'web', kind: 'fetch', statusCode: 404, truncated: false, url: 'https://example.com/x' },
+  web_search: {
+    card: 'web',
+    kind: 'search',
+    sources: [
+      { title: 'deepseek-harness', url: 'https://github.com/deepseek-ai/deepseek-harness' },
+      { url: 'https://example.com/untitled' }
+    ],
+    truncated: false
+  },
   read_window: {
     card: 'read',
     lines: [
@@ -434,6 +445,30 @@ describe('HarnessGatewayClient', () => {
     // a partial list read as complete is how a reader concludes something is
     // not there when it is
     expect(done.payload.result_text).toBe('Found 9 files (showing 1)\nsrc/a.ts')
+  })
+
+  it('reports a fetch as the retrieval, not the page', async () => {
+    const done = await runTool('web_fetch', '{"url":"https://example.com"}')
+
+    // 'raw model-facing text' is 21 bytes; the page itself stays behind ctrl+o
+    expect(done.payload.result_text).toBe('Received 21 bytes (200 OK)')
+    expect(done.payload.result_raw).toBe('raw model-facing text')
+  })
+
+  it('names the status a fetch came back with', async () => {
+    const done = await runTool('web_fetch_gone', '{"url":"https://example.com/x"}')
+
+    expect(done.payload.result_text).toBe('Received 21 bytes (404 Not Found)')
+  })
+
+  it('accounts for a search’s round trip, keeping its sources for ctrl+o', async () => {
+    const done = await runTool('web_search', '{"query":"deepseek harness"}')
+
+    // what the search FOUND is the model's answer to give
+    expect(done.payload.result_text).toMatch(/^Did 1 search in \d+s$/)
+    expect(done.payload.result_raw).toBe(
+      '2 sources\ndeepseek-harness — https://github.com/deepseek-ai/deepseek-harness\nhttps://example.com/untitled'
+    )
   })
 
   it('marks a result flagged isError as failed even with no harness error identity', async () => {
