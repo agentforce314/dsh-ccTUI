@@ -9,7 +9,7 @@
  *   ⏺ Search(pattern: "presentResult", path: "src")
  *   ⏺ Write(notes.txt)
  *
- * Two rules produce all four shapes. Render the arguments as `key: value`
+ * One rule produces all four shapes: render the arguments as `key: value`
  * pairs, and collapse to the bare value when only one pair survives. What
  * "survives" is the interesting part: an argument carrying BULK (a file's new
  * content, an edit's replacement text, a todo list) or POLICY (a sandbox
@@ -20,6 +20,10 @@
  * `bash(command, description, sandbox_permissions, justification)` reduces to
  * `Bash(ls -1 src)` — no per-tool table, no tool names hard-coded here.
  *
+ * Two refinements keep that rule honest against real argument shapes: a
+ * `description` is held back until nothing sharper survives (see LABEL_KEYS),
+ * and an object argument is identified by its own `name` (see identify).
+ *
  * Deliberately derived from the raw arguments rather than the harness's own
  * `presentCall` title: the title restates the tool's verb ("Read src/a.ts"),
  * which the row already prints, and a shell command that happens to start with
@@ -29,9 +33,9 @@
 /**
  * Arguments that never identify a call. Bulk payloads (a file body, an edit's
  * before/after, a checklist, a delegation's brief, a plan under review, a
- * workflow's script) and policy/qualifier fields
- * (why a command may escalate, which window of a file to read) both make the
- * row longer and less distinguishable, which is the opposite of the point.
+ * workflow's script) and policy/qualifier fields (why a command may escalate,
+ * which window of a file to read) both make the row longer and less
+ * distinguishable, which is the opposite of the point.
  */
 const NOISE_KEYS: ReadonlySet<string> = new Set([
   // bulk payloads
