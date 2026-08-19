@@ -32,17 +32,27 @@ class ProbeAdapter extends LlmAdapter {
       .slice(lastUserIndex(msgs) + 1)
       .some(m => Array.isArray(m.content) && m.content.some(b => b.type === 'tool-result'))
 
-    const m = /^PROBE\s+(\S+)\s+([\s\S]*)$/.exec(user.trim())
+    // `PROBE <tool> <json>`, or several separated by ` ;; ` to exercise the
+    // collapsed brief, which only reads right across a RUN of calls.
+    const calls = user
+      .trim()
+      .split(' ;; ')
+      .map(part => /^PROBE\s+(\S+)\s*([\s\S]*)$/.exec(part.trim()))
+      .filter(Boolean)
 
-    if (m && !hasToolResult) {
-      const name = m[1]
-      const args = m[2].trim() || '{}'
-      const id = `probe-${++seq}`
-      yield { blockType: 'tool-call', index: 0, type: 'block-start' }
-      yield { argumentsDelta: args, id, name, type: 'tool-call-delta', index: 0 }
-      yield { block: { arguments: args, id, name, type: 'tool-call' }, index: 0, type: 'block-end' }
+    if (calls.length && !hasToolResult) {
+      for (const [index, m] of calls.entries()) {
+        const name = m[1]
+        const args = m[2].trim() || '{}'
+        const id = `probe-${++seq}`
+        yield { blockType: 'tool-call', index, type: 'block-start' }
+        yield { argumentsDelta: args, id, name, type: 'tool-call-delta', index }
+        yield { block: { arguments: args, id, name, type: 'tool-call' }, index, type: 'block-end' }
+      }
+
       yield { type: 'usage', usage: { inputTokens: 10, outputTokens: 5 } }
       yield { reason: { kind: 'tool-calls' }, type: 'finish' }
+
       return
     }
 

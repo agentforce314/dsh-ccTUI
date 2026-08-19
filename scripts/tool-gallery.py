@@ -82,8 +82,27 @@ SCENARIOS: dict[str, object] = {
         'PROBE subagent {"description": "Audit the tests", "prompt": "Summarise the test layout and stop."}'
     ),
     "skill": 'PROBE skill {"name": "nonexistent-skill"}',
+    "read_image": 'PROBE read_image {"file_path": "e2e-scratch/gallery.png"}',
+    "str_replace_editor": 'PROBE str_replace_editor {"command": "view", "path": "src/domain/usage.ts"}',
+    "job_output": 'PROBE job_output {"job_id": "no-such-job"}',
+    "send_message": 'PROBE send_message {"subagent_id": "no-such-agent", "message": "hello"}',
+    "get_goal": 'PROBE get_goal {}',
+    # plan mode has to be on before the tool will run; pair with --live to catch
+    # the review prompt while it is up
+    "exit_plan_mode": [
+        '/plan',
+        'PROBE exit_plan_mode {"plan": "# Close the tool-result gaps\\n\\n- read cards\\n- search cards"}'
+    ],
     "job_list": 'PROBE job_list {}',
     "list_agents": 'PROBE list_agents {}',
+    # a RUN of calls, which is the only way the collapsed brief reads right
+    "mixed_run": (
+        'PROBE read {"file_path": "src/domain/usage.ts"}'
+        ' ;; PROBE read {"file_path": "src/domain/roles.ts"}'
+        ' ;; PROBE glob {"pattern": "src/domain/*.ts"}'
+        ' ;; PROBE bash {"command": "ls -1 src | head -3", "description": "peek"}'
+        ' ;; PROBE bash {"command": "echo hi", "description": "echo"}'
+    ),
     "todo": (
         'PROBE todo_write {"todos": [{"content": "first task", "status": "in_progress"},'
         ' {"content": "second task", "status": "pending"}]}'
