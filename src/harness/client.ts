@@ -96,6 +96,61 @@ const failureText = (message: string, identity?: { code: string; name: string })
   return /^error\b/i.test(body) ? body : `Error: ${body}`
 }
 
+/** `1 file` / `2 files` — the count the ⎿ summary lines are built from. */
+const plural = (count: number, one: string, many = `${one}s`) => `${count} ${count === 1 ? one : many}`
+
+/**
+ * A read's ⎿ line. The original says `Read 4 lines` and stops — the file's text
+ * is what the MODEL was given, and repeating it inline would bury the turn. The
+ * lines still ride along as the expanded (ctrl+o) body, where a reader who
+ * wants to see what the model saw can ask for it.
+ */
+const readCard = (view: {
+  lines?: { number: number; text: string }[]
+  path?: string
+}): { resultRaw: string; resultText: string } => {
+  const lines = view.lines ?? []
+  const width = String(lines.at(-1)?.number ?? 0).length
+
+  return {
+    resultRaw: lines.map(line => `${String(line.number).padStart(width)}  ${line.text}`).join('\n'),
+    resultText: `Read ${plural(lines.length, 'line')}`
+  }
+}
+
+/**
+ * A search's ⎿ line, over the rows it found: `Found 37 files` for a path search,
+ * `Found 6 lines` for a content search — the original's own two phrasings, and
+ * literally what each one counts (a grep returns matched LINES, several of which
+ * may share a file).
+ *
+ * `total` is what the search FOUND, which is not always what it kept, so a
+ * capped result says how much of it is on screen. A partial list read as
+ * complete is how a reader concludes something is not there when it is.
+ */
+const searchCard = (view: {
+  files?: { matches?: { line: string; lineNumber: number }[]; path: string }[]
+  paths?: string[]
+  shape?: string
+  total?: number
+  truncated?: boolean
+}): { resultRaw: string; resultText: string } => {
+  const total = view.total ?? 0
+  const matches = view.shape === 'matches'
+  const rows = matches
+    ? (view.files ?? []).flatMap(file =>
+        (file.matches ?? []).map(match => `${file.path}:${match.lineNumber}:${match.line}`)
+      )
+    : (view.paths ?? [])
+
+  const found = `Found ${plural(total, matches ? 'line' : 'file')}`
+
+  const summary = view.truncated && rows.length < total ? `${found} (showing ${rows.length})` : found
+  const body = [summary, ...rows].join('\n')
+
+  return { resultRaw: body, resultText: body }
+}
+
 /** Strip a lone ```lang fence so a fenced body reads as plain output. */
 const unfence = (text: string): string => {
   const match = /^```[^\n]*\n([\s\S]*?)\n?```$/.exec(text.trim())
@@ -454,6 +509,7 @@ export class HarnessGatewayClient extends GatewayClient {
             error:
               error || block.isError || view.failed ? failureText(view.resultText, error) : undefined,
             name: this.callNames.get(id),
+            result_raw: view.resultRaw,
             result_text: view.resultText,
             structured_diff: view.structuredDiff,
             todos: todos ?? undefined,
@@ -687,7 +743,7 @@ export class HarnessGatewayClient extends GatewayClient {
     content: readonly ContentBlock[],
     isError: boolean,
     meta: unknown
-  ): { failed?: boolean; resultText: string; structuredDiff?: StructuredDiffPayload } {
+  ): { failed?: boolean; resultRaw?: string; resultText: string; structuredDiff?: StructuredDiffPayload } {
     const fallback = textOf(content, ['text'])
     const name = this.callNames.get(callId)
     const rawArgs = this.callRawArgs.get(callId)
@@ -783,11 +839,19 @@ export class HarnessGatewayClient extends GatewayClient {
     }
 
     if (view.card === 'search') {
-      const search = view as { paths?: string[]; total?: number }
+      return searchCard(
+        view as {
+          files?: { matches?: { line: string; lineNumber: number }[]; path: string }[]
+          paths?: string[]
+          shape?: string
+          total?: number
+          truncated?: boolean
+        }
+      )
+    }
 
-      if (Array.isArray(search.paths)) {
-        return { resultText: search.paths.join(String.fromCharCode(10)) || fallback }
-      }
+    if (view.card === 'read') {
+      return readCard(view as { lines?: { number: number; text: string }[] })
     }
 
     return { resultText: fallback }

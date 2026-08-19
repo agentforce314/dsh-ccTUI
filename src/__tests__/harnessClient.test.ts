@@ -12,6 +12,37 @@ type Listener = (...args: unknown[]) => void
 
 const SESSION = { events: [] as unknown[], header: { createdAt: 100, cwd: '/tmp/w', id: 'cc-test-session', version: 1 }, marker: 'session' }
 
+const TOOL_CARDS: Record<string, unknown> = {
+  bash: { card: 'terminal', exitCode: 0, output: 'ran fine' },
+  failing_bash: { card: 'terminal', exitCode: 1, output: 'ls: nope: No such file or directory\n' },
+  fenced: { card: 'generic', content: [{ text: '```console\nboom\n```', type: 'text' }] },
+  glob: { card: 'search', paths: ['src/a.ts', 'src/b.ts'], shape: 'paths', total: 2, truncated: false },
+  glob_capped: { card: 'search', paths: ['src/a.ts'], shape: 'paths', total: 9, truncated: true },
+  grep: {
+    card: 'search',
+    files: [
+      { matches: [{ line: 'const a = 1', lineNumber: 3 }], path: 'src/a.ts' },
+      { matches: [{ line: 'const a = 2', lineNumber: 7 }], path: 'src/b.ts' }
+    ],
+    shape: 'matches',
+    total: 2,
+    truncated: false
+  },
+  killed_bash: { card: 'terminal', output: 'partial', signal: 'SIGTERM' },
+  read_window: {
+    card: 'read',
+    lines: [
+      { number: 8, text: 'import x' },
+      { number: 9, text: '' },
+      { number: 10, text: 'export const y = 1' }
+    ],
+    offset: 8,
+    path: 'src/y.ts',
+    totalLines: 40
+  },
+  write: { card: 'diff', diffs: [{ newText: 'line one\nline two\n', oldText: null, path: 'notes.txt' }] }
+}
+
 function makeWorld() {
   const listeners = new Map<string, Listener[]>()
   const followups: unknown[] = []
@@ -52,28 +83,16 @@ function makeWorld() {
     get: (name: string) => {
       if (name === 'tools') {
         return {
-          get: (toolName: string) =>
-            toolName === 'write'
-              ? {
-                  presentResult: (_args: unknown, result: { isError: boolean }) =>
-                    result.isError
-                      ? undefined
-                      : { card: 'diff', diffs: [{ newText: 'line one\nline two\n', oldText: null, path: 'notes.txt' }] }
-                }
-              : toolName === 'bash'
-                ? { presentResult: () => ({ card: 'terminal', exitCode: 0, output: 'ran fine' }) }
-                : toolName === 'failing_bash'
-                  ? { presentResult: () => ({ card: 'terminal', exitCode: 1, output: 'ls: nope: No such file or directory\n' }) }
-                  : toolName === 'killed_bash'
-                    ? { presentResult: () => ({ card: 'terminal', output: 'partial', signal: 'SIGTERM' }) }
-                    : toolName === 'fenced'
-                      ? {
-                          presentResult: () => ({
-                            card: 'generic',
-                            content: [{ text: '```console\nboom\n```', type: 'text' }]
-                          })
-                        }
-                      : undefined,
+          // One entry per presentation card the real tools return. Like them,
+          // every card is withheld on a failed call, so the error path renders
+          // the tool's own message rather than an empty card.
+          get: (toolName: string) => {
+            const card = TOOL_CARDS[toolName]
+
+            return card
+              ? { presentResult: (_args: unknown, result: { isError: boolean }) => (result.isError ? undefined : card) }
+              : undefined
+          },
           schemas: () => [{ name: 'bash' }, { name: 'read' }]
         }
       }
@@ -368,6 +387,53 @@ describe('HarnessGatewayClient', () => {
     const done = w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
 
     expect(done.payload.result_text).toBe('boom')
+  })
+
+  const runTool = async (name: string, args = '{}') => {
+    const w = makeWorld()
+
+    w.client.start()
+    await settle()
+    w.events.length = 0
+    w.fire('turn/start', { turn: 1 })
+    w.fire('tool/call', { arguments: args, callId: 'x1', name, step: 1, turn: 1 })
+    w.fire('tool/result', {
+      message: { content: [{ content: [{ text: 'raw model-facing text', type: 'text' }], toolCallId: 'x1', type: 'tool-result' }] },
+      step: 1,
+      turn: 1
+    })
+
+    return w.events.at(-1) as Extract<GatewayEvent, { type: 'tool.complete' }>
+  }
+
+  it('summarises a read as its line count, keeping the text for ctrl+o', async () => {
+    const done = await runTool('read_window', '{"file_path":"src/y.ts","offset":8}')
+
+    // upstream renders `⎿ Read 3 lines` and stops — the file's text is what the
+    // MODEL was handed, and repeating it inline would bury the turn.
+    expect(done.payload.result_text).toBe('Read 3 lines')
+    expect(done.payload.result_raw).toBe(' 8  import x\n 9  \n10  export const y = 1')
+  })
+
+  it('counts a path search in files', async () => {
+    const done = await runTool('glob', '{"pattern":"src/*.ts"}')
+
+    expect(done.payload.result_text).toBe('Found 2 files\nsrc/a.ts\nsrc/b.ts')
+  })
+
+  it('counts a content search in lines, the way upstream words it', async () => {
+    const done = await runTool('grep', '{"pattern":"const a"}')
+
+    // a grep returns matched LINES, several of which may share a file
+    expect(done.payload.result_text).toBe('Found 2 lines\nsrc/a.ts:3:const a = 1\nsrc/b.ts:7:const a = 2')
+  })
+
+  it('says how much of a capped search is on screen', async () => {
+    const done = await runTool('glob_capped', '{"pattern":"**/*"}')
+
+    // a partial list read as complete is how a reader concludes something is
+    // not there when it is
+    expect(done.payload.result_text).toBe('Found 9 files (showing 1)\nsrc/a.ts')
   })
 
   it('marks a result flagged isError as failed even with no harness error identity', async () => {
