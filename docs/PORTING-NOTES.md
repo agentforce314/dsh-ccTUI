@@ -150,3 +150,21 @@ observed behavior instead of leaving it skipped.
   dist/ or src/), so the panel reads "dsh-ccTUI v0.2.0".
 - e2e determinism fix: the write-tool scenario deletes its probe file first — a leftover
   file turned the create into an update and hit the read-before-write observation policy.
+
+## Stage 11 — ocean-blue brand, own data directory (v0.2.1)
+
+- The banner shipped GREEN despite the v0.2.0 rebrand: `readLogoColorSync` read
+  `~/.clawcodex/config.json`, so a clawcodex `/logo forest` preference overrode the new
+  default. Two fixes: the app now owns `~/.dsh-cctui` (`src/lib/appHome.ts`, env override
+  `DSH_CCTUI_HOME`) for the logo pref, prompt history, lifecycle logs, perf log, heapdumps
+  and the memory-file home; and `config.set logoColor` persists there (previously it fell
+  through to `{}`, so `/logo` silently failed to stick).
+  No migration from `~/.clawcodex` — inheriting another product's UI prefs is the bug.
+- Brand palette is the existing `ocean` ramp (now `DEFAULT_LOGO_PALETTE`), not a bespoke
+  one; `LOGO_BRAND` pins the same six stops as literals and a test asserts they match.
+- Theme brand hue moved off Claude terracotta to DeepSeek blue: dark `#4D6BFE`,
+  light `#3A57E8` (deeper for contrast on white), shimmer band recolored to match. This is
+  what makes the whole header/chrome read blue, not just the ASCII art.
+- Testing lesson that caused this: the v0.2.0 e2e asserted banner *glyphs* but never the
+  SGR *colors*, so a stale palette passed. The e2e now asserts every brand-colored run in
+  the banner region is blue-dominant, and a unit test pins the default ramp to ocean.

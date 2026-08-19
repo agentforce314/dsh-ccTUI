@@ -20,27 +20,25 @@ import { DEFAULT_THEME } from '../theme.js'
 const C = DEFAULT_THEME.color
 
 // The shipped brand ramp (banner.ts LOGO_BRAND) — the default look that unset
-// AND explicit "whale" must both keep.
-const BRAND_TOP = 'rgb(150,180,255)'
+// AND explicit "ocean" must both keep.
+const BRAND_TOP = 'rgb(170,220,255)'
 
 describe('logo palette table (StartupScreen.palettes.ts parity)', () => {
-  it('carries the five palettes with six gradient stops each', () => {
-    expect(LOGO_PALETTE_NAMES).toEqual(['whale', 'sunset', 'forest', 'ocean', 'monochrome'])
+  it('carries the four palettes with six gradient stops each', () => {
+    expect(LOGO_PALETTE_NAMES).toEqual(['sunset', 'forest', 'ocean', 'monochrome'])
 
     for (const name of LOGO_PALETTE_NAMES) {
       expect(LOGO_PALETTES[name].gradient).toHaveLength(6)
     }
 
-    expect(DEFAULT_LOGO_PALETTE).toBe('whale')
-    expect(LOGO_PALETTE_LABELS.whale).toBe('Whale (default)')
+    expect(DEFAULT_LOGO_PALETTE).toBe('ocean')
+    expect(LOGO_PALETTE_LABELS.ocean).toBe('Ocean blue (default)')
     expect(LOGO_PALETTE_LABELS.sunset).toBe('Sunset')
     expect(LOGO_PALETTE_LABELS.forest).toBe('Forest green')
-    expect(LOGO_PALETTE_LABELS.ocean).toBe('Ocean blue')
     expect(LOGO_PALETTE_LABELS.monochrome).toBe('Monochrome')
   })
 
   it('spot-checks verbatim TS gradient values', () => {
-    expect(LOGO_PALETTES.whale.gradient[2]).toEqual([77, 107, 254])
     expect(LOGO_PALETTES.sunset.gradient[0]).toEqual([255, 180, 100])
     expect(LOGO_PALETTES.forest.gradient[5]).toEqual([25, 80, 45])
     expect(LOGO_PALETTES.ocean.gradient[2]).toEqual([80, 150, 220])
@@ -74,14 +72,33 @@ describe('gradientStopForRow', () => {
 })
 
 describe('banner painting with /logo palettes', () => {
-  it('keeps the shipped brand ramp for unset and explicit whale', () => {
+  it('keeps the shipped brand ramp for unset and explicit ocean', () => {
     expect(wordmarkGradient(undefined)[0]).toBe(BRAND_TOP)
     expect(wordmarkGradient('')[0]).toBe(BRAND_TOP)
-    expect(wordmarkGradient('whale')[0]).toBe(BRAND_TOP)
+    expect(wordmarkGradient('ocean')[0]).toBe(BRAND_TOP)
     expect(wordmarkGradient('not-a-palette')[0]).toBe(BRAND_TOP)
 
-    const rows = logo(C, undefined, 'whale')
+    const rows = logo(C, undefined, 'ocean')
     expect(rows[0]![0]).toBe(BRAND_TOP)
+  })
+
+  // The banner pins LOGO_BRAND as literal strings so a palette retune cannot
+  // silently restyle the shipped wordmark; this keeps the two in lockstep.
+  it('paints the DEFAULT wordmark and whale in the ocean blues', () => {
+    const oceanStops = LOGO_PALETTES[DEFAULT_LOGO_PALETTE].gradient
+
+    expect(DEFAULT_LOGO_PALETTE).toBe('ocean')
+    expect(wordmarkGradient(undefined)).toEqual(oceanStops.map(rgbStr))
+
+    const rows = logo(C, undefined, undefined)
+    rows.forEach((row, i) => expect(row[0]).toBe(rgbStr(oceanStops[i]!)))
+
+    // every default banner row must be blue-dominant (B > R and B > G)
+    for (const [color] of [...rows, ...whale(C, undefined, undefined)]) {
+      const [, r, g, b] = /rgb\((\d+),(\d+),(\d+)\)/.exec(color)!.map(Number)
+      expect(b).toBeGreaterThan(r!)
+      expect(b).toBeGreaterThan(g!)
+    }
   })
 
   it('paints wordmark rows from a non-default palette gradient', () => {
@@ -90,12 +107,12 @@ describe('banner painting with /logo palettes', () => {
     rows.forEach((row, i) => expect(row[0]).toBe(rgbStr(LOGO_PALETTES.ocean.gradient[i]!)))
   })
 
-  it('paints whale rows from the active palette (default: whale blues)', () => {
+  it('paints whale rows from the active palette (default: ocean blues)', () => {
     const themed = whale(C, undefined, undefined)
-    const explicit = whale(C, undefined, 'whale')
+    const explicit = whale(C, undefined, 'ocean')
     expect(explicit).toEqual(themed)
     themed.forEach((row, i) =>
-      expect(row[0]).toBe(rgbStr(gradientStopForRow(LOGO_PALETTES.whale.gradient, i, 6)))
+      expect(row[0]).toBe(rgbStr(gradientStopForRow(LOGO_PALETTES.ocean.gradient, i, 6)))
     )
 
     const forest = whale(C, undefined, 'forest')
@@ -115,14 +132,14 @@ describe('banner painting with /logo palettes', () => {
 })
 
 describe('readLogoColorSync', () => {
-  const prevHome = process.env.CLAWCODEX_HOME
+  const prevHome = process.env.DSH_CCTUI_HOME
   let dir = ''
 
   afterEach(() => {
     if (prevHome === undefined) {
-      delete process.env.CLAWCODEX_HOME
+      delete process.env.DSH_CCTUI_HOME
     } else {
-      process.env.CLAWCODEX_HOME = prevHome
+      process.env.DSH_CCTUI_HOME = prevHome
     }
 
     if (dir) {
@@ -132,14 +149,14 @@ describe('readLogoColorSync', () => {
   })
 
   const home = (config?: string) => {
-    dir = mkdtempSync(join(tmpdir(), 'clawcodex-logo-'))
+    dir = mkdtempSync(join(tmpdir(), 'dsh-cctui-logo-'))
     mkdirSync(dir, { recursive: true })
 
     if (config !== undefined) {
       writeFileSync(join(dir, 'config.json'), config)
     }
 
-    process.env.CLAWCODEX_HOME = dir
+    process.env.DSH_CCTUI_HOME = dir
   }
 
   it('reads a valid persisted palette name', () => {

@@ -40,7 +40,7 @@ describe('/logo TUI-local command', () => {
 
   it('is registered with the palette grammar', () => {
     expect(logoCmd).toBeDefined()
-    expect(logoCmd.argumentHint).toBe('[whale|sunset|forest|ocean|monochrome]')
+    expect(logoCmd.argumentHint).toBe('[sunset|forest|ocean|monochrome]')
   })
 
   it('bare /logo opens the picker overlay (the original local-jsx LogoPicker)', () => {
@@ -82,7 +82,7 @@ describe('/logo TUI-local command', () => {
     const { ctx, rpc, sys } = makeCtx({ ok: true })
     logoCmd.run('lava', ctx, '/logo lava')
 
-    expect(sys).toHaveBeenCalledWith('usage: /logo [whale|sunset|forest|ocean|monochrome]')
+    expect(sys).toHaveBeenCalledWith('usage: /logo [sunset|forest|ocean|monochrome]')
     expect(getUiState().logoPalette).toBe('')
     expect(getOverlayState().logoPicker).toBe(false)
     expect(rpc).not.toHaveBeenCalled()

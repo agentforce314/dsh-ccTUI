@@ -143,3 +143,6 @@ Acceptance: docs merged to `main`.
   plan review, permission modes, sessions/resume, command bridge, model picker, usage
   metering, checkout-based install. Remaining ideas live in PORTING-NOTES (skipped upstream
   test skew, features with no harness backend).
+- 2026-08-18: v0.2.1 — ocean-blue brand ramp + DeepSeek-blue theme hue; the app owns
+  `~/.dsh-cctui` (no longer reads clawcodex's config); `/logo` persistence implemented;
+  banner colors now regression-tested.

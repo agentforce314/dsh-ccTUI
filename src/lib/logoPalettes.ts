@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import { appHomePath } from './appHome.js'
+
 /**
  * Color palettes for the startup banner logo, selected via /logo.
  *
@@ -29,20 +31,6 @@ export interface LogoPalette {
 }
 
 export const LOGO_PALETTES = {
-  whale: {
-    gradient: [
-      [150, 180, 255],
-      [110, 145, 255],
-      [77, 107, 254],
-      [56, 82, 215],
-      [40, 60, 170],
-      [28, 42, 120]
-    ],
-    accent: [110, 150, 255],
-    cream: [190, 205, 240],
-    dim: [95, 110, 150],
-    border: [70, 85, 120]
-  },
   sunset: {
     gradient: [
       [255, 180, 100],
@@ -105,13 +93,12 @@ export type LogoPaletteName = keyof typeof LOGO_PALETTES
 
 export const LOGO_PALETTE_NAMES = Object.keys(LOGO_PALETTES) as LogoPaletteName[]
 
-export const DEFAULT_LOGO_PALETTE: LogoPaletteName = 'whale'
+export const DEFAULT_LOGO_PALETTE: LogoPaletteName = 'ocean'
 
 export const LOGO_PALETTE_LABELS: Record<LogoPaletteName, string> = {
-  whale: 'Whale (default)',
   sunset: 'Sunset',
   forest: 'Forest green',
-  ocean: 'Ocean blue',
+  ocean: 'Ocean blue (default)',
   monochrome: 'Monochrome'
 }
 
@@ -143,8 +130,7 @@ export function gradientStopForRow(stops: readonly RGB[], i: number, n: number):
  */
 export function readLogoColorSync(): '' | LogoPaletteName {
   try {
-    const dir = process.env.CLAWCODEX_HOME ?? join(homedir(), '.clawcodex')
-    const parsed: unknown = JSON.parse(readFileSync(join(dir, 'config.json'), 'utf8'))
+    const parsed: unknown = JSON.parse(readFileSync(appHomePath('config.json'), 'utf8'))
     const value = (parsed as { logoColor?: unknown }).logoColor
 
     return isLogoPaletteName(value) ? value : ''

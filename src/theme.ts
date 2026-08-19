@@ -269,10 +269,10 @@ const cleanPromptSymbol = (s: string | undefined, fallback: string) => {
 
 export const DARK_THEME: Theme = {
   color: {
-    // Claude Code palette: the warm orange #D77757 is the only brand hue; all
-    // secondary text recedes to neutral grays so the orange draws focus.
-    primary: '#D77757',
-    accent: '#D77757',
+    // DeepSeek palette: the brand blue #4D6BFE is the only brand hue; all
+    // secondary text recedes to neutral grays so the blue draws focus.
+    primary: '#4D6BFE',
+    accent: '#4D6BFE',
     border: '#505050',
     text: '#FFFFFF',
     muted: 'rgb(153,153,153)',
@@ -305,7 +305,7 @@ export const DARK_THEME: Theme = {
     // visual contrast" (utils/theme.ts).
     userMessageBackground: 'rgb(55,55,55)',
 
-    claudeShimmer: 'rgb(235,159,127)',
+    claudeShimmer: 'rgb(150,180,255)',
     subtle: 'rgb(80,80,80)',
     planMode: 'rgb(72,150,140)',
     autoAccept: 'rgb(175,135,255)',
@@ -334,15 +334,16 @@ export const DARK_THEME: Theme = {
 // cleanly (#11300).
 export const LIGHT_THEME: Theme = {
   color: {
-    primary: '#D77757',
-    accent: '#D77757',
+    // A deeper blue than the dark theme's so the brand hue keeps contrast on white.
+    primary: '#3A57E8',
+    accent: '#3A57E8',
     border: '#AFAFAF',
     text: '#000000',
     muted: '#666666',
     completionBg: '#F5F5F5',
-    completionCurrentBg: mix('#F5F5F5', '#D77757', 0.25),
+    completionCurrentBg: mix('#F5F5F5', '#3A57E8', 0.25),
     completionMetaBg: '#F5F5F5',
-    completionMetaCurrentBg: mix('#F5F5F5', '#D77757', 0.25),
+    completionMetaCurrentBg: mix('#F5F5F5', '#3A57E8', 0.25),
 
     label: '#666666',
     ok: '#2C7A39',
@@ -366,7 +367,7 @@ export const LIGHT_THEME: Theme = {
     // optimal contrast" (utils/theme.ts).
     userMessageBackground: 'rgb(240,240,240)',
 
-    claudeShimmer: 'rgb(245,149,117)',
+    claudeShimmer: 'rgb(105,140,250)',
     subtle: 'rgb(175,175,175)',
     planMode: 'rgb(0,102,102)',
     autoAccept: 'rgb(135,0,255)',

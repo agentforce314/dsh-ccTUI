@@ -206,6 +206,19 @@ class TuiSession:
             (HOME / f"e2e-{self.label}.transcript").write_bytes(bytes(self.transcript))
 
 
+def banner_is_blue(raw: str) -> bool:
+    """Every SGR truecolor run painting the wordmark/whale must be blue-dominant."""
+    i = raw.find("\u2588\u2588")  # first wordmark block glyph
+    if i < 0:
+        return False
+    window = raw[max(0, i - 400):i + 2500]
+    codes = [tuple(map(int, m)) for m in re.findall(r"\x1b\[38;2;(\d+);(\d+);(\d+)m", window)]
+    brand = [c for c in codes if max(c) - min(c) > 30]  # ignore greys/chrome
+    if not brand:
+        return False
+    return all(b > r and b > g for r, g, b in brand[:8])
+
+
 def phase1(failures: list[str]) -> None:
     # the write-tool scenario must CREATE the probe file, not update a leftover
     (ROOT / "e2e-scratch" / "e2e-write-probe.txt").unlink(missing_ok=True)
@@ -251,8 +264,12 @@ def phase1(failures: list[str]) -> None:
     finally:
         s.finish()
     flat = s.flat()
+    raw_text = bytes(s.transcript).decode("utf-8", "replace")
     for label, ok in [
         ("p1 banner/composer rendered", PROMPT_GLYPH in flat),
+        # Colors, not just glyphs: the banner regressed to a stale green palette
+        # once because only the ART was asserted. Pin the shipped ocean ramp.
+        ("p1 banner painted in ocean blue", banner_is_blue(raw_text)),
         ("p1 mock reply streamed", "MOCK-REPLY: hello harness" in flat),
         ("p1 approval prompt shown", "Yes" in flat and "bash" in flat),
         ("p1 approved tool ran to completion", "TOOL-STEP-DONE" in flat),

@@ -2,6 +2,8 @@ import { appendFileSync, mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
+import { appHomePath } from './appHome.js'
+
 // Mirror the Python gateway's panic log (tui_gateway/server.py::_CRASH_LOG) from
 // the Node parent so lifecycle breadcrumbs interleave, by timestamp, with the
 // child's `=== SIGTERM received ===` / `=== gateway exit ===` entries.
@@ -18,7 +20,7 @@ import { join } from 'node:path'
 // is swallowed). Persisting the death-explaining events here is what makes that
 // distinction (and a memory-critical `process.exit(137)`, which closes stdin →
 // clean EOF, not SIGTERM) diagnosable after the fact.
-const logDir = join(process.env.CLAWCODEX_HOME?.trim() || join(homedir(), '.clawcodex'), 'logs')
+const logDir = appHomePath('logs')
 const CRASH_LOG = join(logDir, 'tui_gateway_crash.log')
 
 // Skipped under vitest so unit tests exercising start()/kill() can't write into
