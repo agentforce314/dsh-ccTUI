@@ -28,7 +28,8 @@
 
 /**
  * Arguments that never identify a call. Bulk payloads (a file body, an edit's
- * before/after, a checklist, a delegation's brief) and policy/qualifier fields
+ * before/after, a checklist, a delegation's brief, a plan under review) and
+ * policy/qualifier fields
  * (why a command may escalate, which window of a file to read) both make the
  * row longer and less distinguishable, which is the opposite of the point.
  */
@@ -41,6 +42,7 @@ const NOISE_KEYS: ReadonlySet<string> = new Set([
   'new_string',
   'old_str',
   'old_string',
+  'plan',
   'prompt',
   'todos',
   // policy / qualifiers
@@ -117,10 +119,10 @@ export const toolArgsPreview = (raw: string): string => {
     return project(salient)
   }
 
-  const labels = entries.filter(([key]) => LABEL_KEYS.has(key))
-
-  // A call whose every argument is bulk (a bare `todo_write`) still deserves a
-  // row that says something; falling back to the unfiltered projection beats
-  // rendering `⏺ Todo Write()`.
-  return project(labels.length ? labels : entries)
+  // A call whose every argument is bulk or policy has nothing to put in the
+  // parens, and that is the right answer, not a failure: `formatToolCall`
+  // renders a preview-less call as a bare label, which is exactly what the
+  // original shows for `⏺ TodoWrite` and `⏺ ExitPlanMode` — both of which draw
+  // their real content (the checklist, the plan under review) below the row.
+  return project(entries.filter(([key]) => LABEL_KEYS.has(key)))
 }

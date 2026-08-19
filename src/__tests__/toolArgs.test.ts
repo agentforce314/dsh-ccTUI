@@ -48,10 +48,18 @@ describe('toolArgsPreview', () => {
     expect(toolArgsPreview(raw)).toBe('Review the diff')
   })
 
-  it('falls back to the unfiltered projection when every argument is bulk', () => {
-    expect(toolArgsPreview('{"todos":[{"content":"a","status":"pending"}]}')).toBe(
-      'todos: [{"content":"a","status":"pending"}]'
-    )
+  it('does not restate a plan the review box is already showing', () => {
+    const raw = '{"plan":"# Close the gaps\\n\\n- read cards\\n- search cards"}'
+
+    // the plan renders in full right below the row; squeezing it into 64
+    // columns of parens shows it twice, once badly
+    expect(toolArgsPreview(raw)).toBe('')
+  })
+
+  it('renders nothing when every argument is bulk, leaving a bare label', () => {
+    // `⏺ Todo Write` with the checklist below it, the way upstream renders it —
+    // formatToolCall drops the parens entirely for an empty preview
+    expect(toolArgsPreview('{"todos":[{"content":"a","status":"pending"}]}')).toBe('')
   })
 
   it('renders non-string values as JSON', () => {
